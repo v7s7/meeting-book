@@ -2,11 +2,20 @@ import React, { useState, useEffect } from 'react';
 import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
 import { auth, db } from './utils/firebase';
-import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, addDoc, onSnapshot } from 'firebase/firestore';
-import { deleteDoc, doc } from 'firebase/firestore';
+import {
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+} from 'firebase/auth';
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  deleteDoc,
+  doc,
+} from 'firebase/firestore';
 
-const ADMIN_UIDS = ["NvC4POvuBtYbbkDvd8xTmvwVFq33"]; // Replace with your real Firebase UID(s)
+const ADMIN_UIDS = ['NvC4POvuBtYbbkDvd8xTmvwVFq33']; // Replace with your actual admin UID
 
 function App() {
   const [events, setEvents] = useState([]);
@@ -23,12 +32,11 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // 🔁 Real-time Firestore listener
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
+      const data = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }));
       setEvents(data);
     });
@@ -37,51 +45,55 @@ function App() {
   }, []);
 
   const handleSlotSelect = (info) => {
-    setSelectedSlot({ start: info.startStr, end: info.endStr });
+  console.log("HANDLE SLOT SELECT:", info);
+  setSelectedSlot({
+    start: info.start,
+    end: info.end,
+    resourceId: info.resourceId,
+  });
+};
+
+
+  const handleSubmitBooking = async (formData, calculatedEnd) => {
+    const userId = currentUser?.uid || 'guest';
+
+    await addDoc(collection(db, 'bookings'), {
+      title: formData.purpose,
+      start: selectedSlot.start,
+      end: calculatedEnd,
+      name: formData.name,
+      email: formData.email,
+      purpose: formData.purpose,
+      userId,
+      room: selectedSlot.resourceId,
+    });
+
+    setSelectedSlot(null);
   };
 
- const handleSubmitBooking = async (formData, calculatedEnd) => {
-  const userId = currentUser?.uid || 'guest';
+  const handleEventDelete = async (eventId) => {
+    if (!isAdmin) {
+      alert('Only admins can delete bookings.');
+      return;
+    }
 
-  await addDoc(collection(db, 'bookings'), {
-    title: formData.purpose,
-    start: selectedSlot.start,
-    end: calculatedEnd,
-    name: formData.name,
-    email: formData.email,
-    purpose: formData.purpose,
-    userId,
-  });
-
-  setSelectedSlot(null);
-};
-
-
-const handleEventDelete = async (eventId) => {
-  if (!isAdmin) {
-    alert("Only admins can delete bookings.");
-    return;
-  }
-
-  
-
-  try {
-    await deleteDoc(doc(db, 'bookings', eventId));
-  } catch (err) {
-    console.error("Error deleting:", err);
-    alert("Failed to delete booking.");
-  }
-};
+    try {
+      await deleteDoc(doc(db, 'bookings', eventId));
+    } catch (err) {
+      console.error('Error deleting:', err);
+      alert('Failed to delete booking.');
+    }
+  };
 
   const handleCloseForm = () => setSelectedSlot(null);
 
   const handleAdminLogin = async () => {
-    const email = prompt("Enter admin email:");
-    const password = prompt("Enter password:");
+    const email = prompt('Enter admin email:');
+    const password = prompt('Enter password:');
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
-      alert("Login failed: " + err.message);
+      alert('Login failed: ' + err.message);
     }
   };
 
@@ -91,8 +103,7 @@ const handleEventDelete = async (eventId) => {
 
   return (
     <div>
-      <header style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between' }}>
-        <h2>Meeting Booking Calendar</h2>
+      <header style={{ padding: '10px 20px', display: 'flex', justifyContent: 'flex-end' }}>
         {currentUser ? (
           <button onClick={handleLogout}>Logout</button>
         ) : (

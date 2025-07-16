@@ -2,6 +2,7 @@
   "dependencies": {
     "@fullcalendar/interaction": "^6.1.18",
     "@fullcalendar/react": "^6.1.18",
+    "@fullcalendar/resource-timegrid": "^6.1.18",
     "@fullcalendar/timegrid": "^6.1.18"
   }
 }

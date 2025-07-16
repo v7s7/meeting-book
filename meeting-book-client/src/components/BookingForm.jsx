@@ -10,40 +10,45 @@ function BookingForm({ slot, events, onClose, onSubmit }) {
   const [calculatedEnd, setCalculatedEnd] = useState('');
 
   useEffect(() => {
-  if (!slot || !slot.start || !slot.end) return;
+    if (!slot || !slot.start || !slot.end) return;
 
-  const start = new Date(slot.start);
-  const end = new Date(slot.end);
-  const diffMs = end - start;
-  const diffMins = Math.round(diffMs / 60000);
-  
-  const defaultDuration = Math.min(diffMins, 300); // ✅ Up to 5 hours
-  setDuration(defaultDuration);
+    const start = new Date(slot.start);
+    const end = new Date(slot.end);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
 
-  updateCalculatedEnd(defaultDuration);
-}, [slot]);
+    const diffMs = end - start;
+    const diffMins = Math.round(diffMs / 60000);
+    const defaultDuration = Math.min(diffMins, 300); // max 5 hours
 
+    setDuration(defaultDuration);
+    updateCalculatedEnd(defaultDuration);
+  }, [slot]);
 
   useEffect(() => {
     updateCalculatedEnd(duration);
   }, [duration]);
 
   const updateCalculatedEnd = (durationMinutes) => {
-  if (!slot || !slot.start) return;
+    if (!slot || !slot.start) return;
 
-  const start = new Date(slot.start);
-  const newEnd = new Date(start.getTime() + durationMinutes * 60000);
-  setCalculatedEnd(newEnd.toISOString());
+    const start = new Date(slot.start);
+    if (isNaN(start.getTime())) return;
 
-  const conflict = events.some(ev => {
-    const evStart = new Date(ev.start);
-    const evEnd = new Date(ev.end);
-    return start < evEnd && newEnd > evStart;
-  });
+    const newEnd = new Date(start.getTime() + durationMinutes * 60000);
+    setCalculatedEnd(newEnd.toISOString());
 
-  setHasConflict(conflict);
-};
+    const conflict = events.some(ev => {
+      const evStart = new Date(ev.start);
+      const evEnd = new Date(ev.end);
+      return (
+        start < evEnd &&
+        newEnd > evStart &&
+        ev.room === slot.resourceId
+      );
+    });
 
+    setHasConflict(conflict);
+  };
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -52,13 +57,14 @@ function BookingForm({ slot, events, onClose, onSubmit }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (hasConflict) {
-      alert('Time slot is already booked.');
+      alert('This time slot is already booked in this room.');
       return;
     }
-    onSubmit(formData, calculatedEnd);
+
+    onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd);
   };
 
-  if (!slot) return null;
+  if (!slot || !slot.start) return null;
 
   return (
     <div className="overlay">
@@ -66,22 +72,24 @@ function BookingForm({ slot, events, onClose, onSubmit }) {
         <button className="close-btn" onClick={onClose}>×</button>
         <form onSubmit={handleSubmit}>
           <h3>Book Time Slot</h3>
-          <p><strong>Start:</strong> {new Date(slot.start).toLocaleString()}</p>
-<p><strong>End:</strong> {calculatedEnd ? new Date(calculatedEnd).toLocaleString() : '—'}</p>
-          <label>Duration:</label>
-<select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-  <option value={30}>30 minutes</option>
-  <option value={60}>1 hour</option>
-  <option value={90}>1.5 hours</option>
-  <option value={120}>2 hours</option>
-  <option value={150}>2.5 hours</option>
-  <option value={180}>3 hours</option>
-  <option value={210}>3.5 hours</option>
-  <option value={240}>4 hours</option>
-  <option value={270}>4.5 hours</option>
-  <option value={300}>5 hours</option>
-</select>
 
+          <p><strong>Room:</strong> {slot.resourceId || 'Unspecified'}</p>
+          <p><strong>Start:</strong> {new Date(slot.start).toLocaleString()}</p>
+          <p><strong>End:</strong> {calculatedEnd ? new Date(calculatedEnd).toLocaleString() : '—'}</p>
+
+          <label>Duration:</label>
+          <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+            {[...Array(10)].map((_, i) => {
+              const minutes = 30 + i * 30;
+              return (
+                <option key={minutes} value={minutes}>
+                  {minutes % 60 === 0
+                    ? `${minutes / 60} hour${minutes > 60 ? 's' : ''}`
+                    : `${Math.floor(minutes / 60)}h ${minutes % 60}m`}
+                </option>
+              );
+            })}
+          </select>
 
           <input
             type="text"
@@ -107,7 +115,9 @@ function BookingForm({ slot, events, onClose, onSubmit }) {
             onChange={handleChange}
             required
           />
-          {hasConflict && <p className="conflict">This slot is already booked.</p>}
+
+          {hasConflict && <p className="conflict">This slot is already booked in this room.</p>}
+
           <div className="form-actions">
             <button type="submit" disabled={hasConflict}>Confirm</button>
             <button type="button" onClick={onClose}>Cancel</button>
