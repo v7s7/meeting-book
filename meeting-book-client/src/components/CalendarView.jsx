@@ -10,19 +10,24 @@ function CalendarView({ events, onSelectSlot, onDeleteEvent, isAdmin }) {
   const auth = getAuth();
   const currentUserId = auth.currentUser?.uid;
 
- const handleEventClick = (info) => {
+const handleEventClick = (info) => {
   const eventUserId = info.event.extendedProps.userId;
   const isOwner = eventUserId === currentUserId;
 
   if (isOwner || isAdmin) {
+    const room = info.event.extendedProps.room || info.event.getResources?.()[0]?.id || 'this room';
+    const time = new Date(info.event.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     const confirmed = window.confirm(
-      `Delete booking for "${info.event.title}" in ${info.event.extendedProps.room}?`
+      `Delete this booking at ${time} in ${room}?`
     );
+
     if (confirmed) {
       onDeleteEvent(info.event.id);
     }
   }
 };
+
 
 
   return (

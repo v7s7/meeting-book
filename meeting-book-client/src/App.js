@@ -58,15 +58,15 @@ function App() {
     const userId = currentUser?.uid || 'guest';
 
     await addDoc(collection(db, 'bookings'), {
-      title: formData.purpose,
-      start: selectedSlot.start,
-      end: calculatedEnd,
-      name: formData.name,
-      email: formData.email,
-      purpose: formData.purpose,
-      userId,
-      room: selectedSlot.resourceId,
-    });
+  name: formData.name,
+  cpr: formData.cpr,
+  phone: formData.phone,
+  department: formData.department,
+  room: selectedSlot.resourceId,
+  start: selectedSlot.start,
+  end: calculatedEnd,
+  userId
+});
 
     setSelectedSlot(null);
   };

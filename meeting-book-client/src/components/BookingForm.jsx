@@ -4,10 +4,16 @@ import './BookingForm.css';
 
 function BookingForm({ slot, events, onClose, onSubmit }) {
   const auth = getAuth();
-  const [formData, setFormData] = useState({ name: '', email: '', purpose: '' });
+const [formData, setFormData] = useState({
+  name: '',
+  cpr: '',
+  phone: '',
+  department: ''
+});
   const [duration, setDuration] = useState(60);
   const [hasConflict, setHasConflict] = useState(false);
   const [calculatedEnd, setCalculatedEnd] = useState('');
+const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!slot || !slot.start || !slot.end) return;
@@ -54,15 +60,19 @@ function BookingForm({ slot, events, onClose, onSubmit }) {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (hasConflict) {
-      alert('This time slot is already booked in this room.');
-      return;
-    }
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd);
-  };
+  if (hasConflict || isSubmitting) return;
+
+  setIsSubmitting(true);
+  try {
+    await onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   if (!slot || !slot.start) return null;
 
@@ -71,55 +81,77 @@ function BookingForm({ slot, events, onClose, onSubmit }) {
       <div className="form-container">
         <button className="close-btn" onClick={onClose}>×</button>
         <form onSubmit={handleSubmit}>
-          <h3>Book Time Slot</h3>
+    <h3>Book Time Slot</h3>
 
-          <p><strong>Room:</strong> {slot.resourceId || 'Unspecified'}</p>
-          <p><strong>Start:</strong> {new Date(slot.start).toLocaleString()}</p>
-          <p><strong>End:</strong> {calculatedEnd ? new Date(calculatedEnd).toLocaleString() : '—'}</p>
+<p><strong>Room:</strong> {slot.resourceId || 'Unspecified'}</p>
+<p><strong>Start:</strong> {new Date(slot.start).toLocaleString()}</p>
+<p><strong>End:</strong> {calculatedEnd ? new Date(calculatedEnd).toLocaleString() : '—'}</p>
 
-          <label>Duration:</label>
-          <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-            {[...Array(10)].map((_, i) => {
-              const minutes = 30 + i * 30;
-              return (
-                <option key={minutes} value={minutes}>
-                  {minutes % 60 === 0
-                    ? `${minutes / 60} hour${minutes > 60 ? 's' : ''}`
-                    : `${Math.floor(minutes / 60)}h ${minutes % 60}m`}
-                </option>
-              );
-            })}
-          </select>
+<label>Duration:</label>
+<select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+  {[...Array(10)].map((_, i) => {
+    const minutes = 30 + i * 30;
+    return (
+      <option key={minutes} value={minutes}>
+        {minutes % 60 === 0
+          ? `${minutes / 60} hour${minutes > 60 ? 's' : ''}`
+          : `${Math.floor(minutes / 60)}h ${minutes % 60}m`}
+      </option>
+    );
+  })}
+</select>
 
-          <input
-            type="text"
-            name="name"
-            placeholder="Your Name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder="Your Email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="text"
-            name="purpose"
-            placeholder="Purpose"
-            value={formData.purpose}
-            onChange={handleChange}
-            required
-          />
+<label>Name:</label>
+<input
+  type="text"
+  name="name"
+  placeholder="Your Name"
+  value={formData.name}
+  onChange={handleChange}
+  required
+/>
+
+<label>CPR:</label>
+<input
+  type="text"
+  name="cpr"
+  placeholder="CPR Number"
+  value={formData.cpr}
+  onChange={handleChange}
+  required
+/>
+
+<label>Phone Number:</label>
+<input
+  type="tel"
+  name="phone"
+  placeholder="Phone Number"
+  value={formData.phone}
+  onChange={handleChange}
+  required
+/>
+
+<label>Department:</label>
+<select
+  name="department"
+  value={formData.department}
+  onChange={handleChange}
+  required
+>
+  <option value="">Select Department</option>
+  <option value="HR">HR</option>
+  <option value="Finance">Finance</option>
+  <option value="IT">IT</option>
+  <option value="Operations">Operations</option>
+</select>
+
 
           {hasConflict && <p className="conflict">This slot is already booked in this room.</p>}
 
           <div className="form-actions">
-            <button type="submit" disabled={hasConflict}>Confirm</button>
+<button type="submit" disabled={hasConflict || isSubmitting}>
+  {isSubmitting ? 'Booking…' : 'Confirm'}
+</button>
             <button type="button" onClick={onClose}>Cancel</button>
           </div>
         </form>
