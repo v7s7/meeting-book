@@ -115,34 +115,29 @@ const handleSubmitBooking = async (formData, calculatedEnd) => {
 
   // 1. Save to Firestore
   await addDoc(collection(db, 'bookings'), {
+  name: formData.name,
+  cpr: formData.cpr,
+  phone: formData.phone,
+  department: formData.department,
+  room: selectedSlot.resourceId,
+  start: selectedSlot.start,
+  end: calculatedEnd,
+  userId
+});
+
+if (currentUser?.uid) {
+  await setDoc(doc(db, 'users', currentUser.uid), {
     name: formData.name,
     cpr: formData.cpr,
     phone: formData.phone,
-    department: formData.department,
-    room: selectedSlot.resourceId,
-    start: selectedSlot.start,
-    end: calculatedEnd,
-    userId
+    department: formData.department
   });
+}
 
-  // 2. Save profile
-  if (currentUser?.uid) {
-    try {
-      await setDoc(doc(db, 'users', currentUser.uid), {
-        name: formData.name,
-        cpr: formData.cpr,
-        phone: formData.phone,
-        department: formData.department
-      });
-      console.log("✅ Profile saved successfully");
-    } catch (err) {
-      console.error("❌ Failed to save profile:", err);
-    }
-  }
+setSelectedSlot(null); // Clear form early
 
-  // 3. ✅ Send to Google Sheets via n8n webhook
-  try {
-    await fetch('http://localhost:5678/webhook-test/eda4e88f-7000-43c3-be07-a98a4f313027', {
+// ✅ Send to Sheets asynchronously
+fetch('http://localhost:5000/add-booking', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -155,16 +150,13 @@ const handleSubmitBooking = async (formData, calculatedEnd) => {
     end: calculatedEnd,
     userId,
   }),
+}).then(() => {
+  console.log("✅ Sent to Google Sheets");
+}).catch(err => {
+  console.error("❌ Failed to send to Google Sheets:", err);
 });
 
-
-    console.log("✅ Sent to Google Sheets");
-  } catch (err) {
-    console.error("❌ Failed to send to Google Sheets:", err);
-  }
-
-  // 4. Clear form
-  setSelectedSlot(null);
+// ✅ Close handleSubmitBooking here
 };
 
 
