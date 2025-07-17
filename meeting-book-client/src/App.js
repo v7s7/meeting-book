@@ -14,6 +14,8 @@ import {
   deleteDoc,
   doc,
 } from 'firebase/firestore';
+import UserAuthForm from './components/UserAuthForm';
+
 
 const ADMIN_UIDS = ['NvC4POvuBtYbbkDvd8xTmvwVFq33']; // Replace with your actual admin UID
 
@@ -22,6 +24,8 @@ function App() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+const [showUserLogin, setShowUserLogin] = useState(false);
+const [userLastBooking, setUserLastBooking] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -33,16 +37,35 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setEvents(data);
-    });
+  const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-    return () => unsub();
-  }, []);
+    setEvents(
+      data.map(event => ({
+        ...event,
+        title: `${event.name} – ${event.department}`
+      }))
+    );
+
+    // 🔍 Save latest booking info for current user
+    if (currentUser) {
+      const userBookings = data
+        .filter(b => b.userId === currentUser.uid)
+        .sort((a, b) => new Date(b.start) - new Date(a.start)); // latest first
+
+      if (userBookings.length > 0) {
+        const { name, cpr, phone, department } = userBookings[0];
+        setUserLastBooking({ name, cpr, phone, department });
+      }
+    }
+  });
+
+  return () => unsub();
+}, [currentUser]);
+
 
   const handleSlotSelect = (info) => {
   console.log("HANDLE SLOT SELECT:", info);
@@ -72,10 +95,24 @@ function App() {
   };
 
   const handleEventDelete = async (eventId) => {
-    if (!isAdmin) {
-      alert('Only admins can delete bookings.');
-      return;
-    }
+    const handleEventDelete = async (eventId) => {
+  const event = events.find(e => e.id === eventId);
+
+  const isOwner = currentUser?.uid && event?.userId === currentUser.uid;
+
+  if (!isAdmin && !isOwner) {
+    alert('You can only delete your own bookings.');
+    return;
+  }
+
+  try {
+    await deleteDoc(doc(db, 'bookings', eventId));
+  } catch (err) {
+    console.error('Error deleting:', err);
+    alert('Failed to delete booking.');
+  }
+};
+
 
     try {
       await deleteDoc(doc(db, 'bookings', eventId));
@@ -104,11 +141,15 @@ function App() {
   return (
     <div>
       <header style={{ padding: '10px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-        {currentUser ? (
-          <button onClick={handleLogout}>Logout</button>
-        ) : (
-          <button onClick={handleAdminLogin}>Admin Sign In</button>
-        )}
+       {currentUser ? (
+  <button onClick={handleLogout}>Logout</button>
+) : (
+  <>
+    <button onClick={() => setShowUserLogin(true)}>User Login</button>
+    <button onClick={handleAdminLogin}>Admin Sign In</button>
+  </>
+)}
+
       </header>
 
       <CalendarView
@@ -119,11 +160,15 @@ function App() {
       />
 
       <BookingForm
-        slot={selectedSlot}
-        events={events}
-        onClose={handleCloseForm}
-        onSubmit={handleSubmitBooking}
-      />
+  slot={selectedSlot}
+  events={events}
+  onClose={handleCloseForm}
+  onSubmit={handleSubmitBooking}
+  lastUsedData={userLastBooking}
+/>
+
+      {showUserLogin && <UserAuthForm onClose={() => setShowUserLogin(false)} />}
+
     </div>
   );
 }
