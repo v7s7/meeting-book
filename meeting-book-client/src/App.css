@@ -6,9 +6,26 @@ body {
   color: #333;
 }
 
-
 h2 {
   text-align: center;
   margin: 30px 0 10px;
   color: #333;
+}
+
+.login-wrapper {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 40px;     
+  margin-bottom: 10px;
+}
+
+.login-wrapper button {
+  background-color: #2c3e50;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
 }

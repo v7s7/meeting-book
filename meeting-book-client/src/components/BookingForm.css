@@ -87,3 +87,15 @@ button[type="button"]:hover {
   color: #d32f2f;
   font-size: 13px;
 }
+input, select, button {
+  transition: all 0.2s ease;
+}
+@media (max-width: 480px) {
+  .form-container {
+    width: 90%;
+    padding: 20px;
+  }
+}
+button:active {
+  transform: scale(0.98);
+}

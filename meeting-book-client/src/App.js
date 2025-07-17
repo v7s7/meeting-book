@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
 import { auth, db } from './utils/firebase';
+import './App.css';
 import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
@@ -95,7 +96,6 @@ const [userLastBooking, setUserLastBooking] = useState(null);
   };
 
   const handleEventDelete = async (eventId) => {
-    const handleEventDelete = async (eventId) => {
   const event = events.find(e => e.id === eventId);
 
   const isOwner = currentUser?.uid && event?.userId === currentUser.uid;
@@ -111,7 +111,7 @@ const [userLastBooking, setUserLastBooking] = useState(null);
     console.error('Error deleting:', err);
     alert('Failed to delete booking.');
   }
-};
+
 
 
     try {
@@ -125,14 +125,19 @@ const [userLastBooking, setUserLastBooking] = useState(null);
   const handleCloseForm = () => setSelectedSlot(null);
 
   const handleAdminLogin = async () => {
-    const email = prompt('Enter admin email:');
-    const password = prompt('Enter password:');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      alert('Login failed: ' + err.message);
-    }
-  };
+  const email = prompt('Enter admin email:');
+  if (!email) return;  // Exit if cancelled or empty
+
+  const password = prompt('Enter password:');
+  if (!password) return;  // Exit if cancelled or empty
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (err) {
+    alert('Login failed: ' + err.message);
+  }
+};
+
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -140,7 +145,8 @@ const [userLastBooking, setUserLastBooking] = useState(null);
 
   return (
     <div>
-      <header style={{ padding: '10px 20px', display: 'flex', justifyContent: 'flex-end' }}>
+<div className="login-wrapper">
+        
        {currentUser ? (
   <button onClick={handleLogout}>Logout</button>
 ) : (
@@ -150,7 +156,7 @@ const [userLastBooking, setUserLastBooking] = useState(null);
   </>
 )}
 
-      </header>
+</div>
 
       <CalendarView
         events={events}
