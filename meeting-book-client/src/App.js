@@ -105,21 +105,13 @@ const [userLastBooking, setUserLastBooking] = useState(null);
     return;
   }
 
-  try {
-    await deleteDoc(doc(db, 'bookings', eventId));
-  } catch (err) {
-    console.error('Error deleting:', err);
-    alert('Failed to delete booking.');
-  }
+ try {
+  await deleteDoc(doc(db, 'bookings', eventId));
+} catch (err) {
+  console.error('Error deleting:', err);
+  alert('Failed to delete booking.');
+}
 
-
-
-    try {
-      await deleteDoc(doc(db, 'bookings', eventId));
-    } catch (err) {
-      console.error('Error deleting:', err);
-      alert('Failed to delete booking.');
-    }
   };
 
   const handleCloseForm = () => setSelectedSlot(null);

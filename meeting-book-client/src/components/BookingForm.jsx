@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 import './BookingForm.css';
 
-function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
+function BookingForm({ slot, events, onClose, onSubmit }) {
   const auth = getAuth();
 const [formData, setFormData] = useState({
   name: '',
@@ -29,15 +29,6 @@ const [isSubmitting, setIsSubmitting] = useState(false);
     setDuration(defaultDuration);
     updateCalculatedEnd(defaultDuration);
   }, [slot]);
-  useEffect(() => {
-  if (lastUsedData) {
-    setFormData(prev => ({
-      ...prev,
-      ...lastUsedData
-    }));
-  }
-}, [lastUsedData]);
-
 
   useEffect(() => {
     updateCalculatedEnd(duration);
