@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
 import { auth, db } from './utils/firebase';
+import { setDoc } from 'firebase/firestore';
+import { getDoc } from 'firebase/firestore';
+
 import './App.css';
 import {
   signInWithEmailAndPassword,
@@ -29,13 +32,31 @@ const [showUserLogin, setShowUserLogin] = useState(false);
 const [userLastBooking, setUserLastBooking] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setIsAdmin(user && ADMIN_UIDS.includes(user.uid));
-    });
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    setCurrentUser(user);
+    setIsAdmin(user && ADMIN_UIDS.includes(user.uid));
 
-    return () => unsubscribe();
-  }, []);
+   if (user) {
+  const ref = doc(db, 'users', user.uid);
+  console.log("📥 Trying to get user profile for UID:", user.uid);
+
+  try {
+    const userDoc = await getDoc(ref);
+    if (userDoc.exists()) {
+      console.log("✅ Profile loaded:", userDoc.data());
+      setUserLastBooking(userDoc.data());
+    } else {
+      console.log("⚠️ Profile not found for user:", user.uid);
+    }
+  } catch (err) {
+    console.error("❌ Failed to get user profile:", err);
+  }
+}
+
+  });
+
+  return () => unsubscribe();
+}, []);
 
   useEffect(() => {
   const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
@@ -81,7 +102,7 @@ const [userLastBooking, setUserLastBooking] = useState(null);
   const handleSubmitBooking = async (formData, calculatedEnd) => {
     const userId = currentUser?.uid || 'guest';
 
-    await addDoc(collection(db, 'bookings'), {
+ await addDoc(collection(db, 'bookings'), {
   name: formData.name,
   cpr: formData.cpr,
   phone: formData.phone,
@@ -91,6 +112,22 @@ const [userLastBooking, setUserLastBooking] = useState(null);
   end: calculatedEnd,
   userId
 });
+
+// ✅ Save user profile
+if (currentUser?.uid) {
+  try {
+  await setDoc(doc(db, 'users', currentUser.uid), {
+    name: formData.name,
+    cpr: formData.cpr,
+    phone: formData.phone,
+    department: formData.department
+  });
+  console.log("✅ Profile saved successfully");
+} catch (err) {
+  console.error("❌ Failed to save profile:", err);
+}
+
+}
 
     setSelectedSlot(null);
   };

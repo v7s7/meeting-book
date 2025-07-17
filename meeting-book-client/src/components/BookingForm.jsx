@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 import './BookingForm.css';
 
-function BookingForm({ slot, events, onClose, onSubmit }) {
+function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
   const auth = getAuth();
 const [formData, setFormData] = useState({
   name: '',
@@ -14,6 +14,11 @@ const [formData, setFormData] = useState({
   const [hasConflict, setHasConflict] = useState(false);
   const [calculatedEnd, setCalculatedEnd] = useState('');
 const [isSubmitting, setIsSubmitting] = useState(false);
+useEffect(() => {
+  if (lastUsedData) {
+    setFormData(lastUsedData);
+  }
+}, [lastUsedData]);
 
   useEffect(() => {
     if (!slot || !slot.start || !slot.end) return;
