@@ -1,0 +1,6 @@
+# Ignore service account credentials
+booking-service-account.json
+
+# Node modules
+node_modules/
+.env
