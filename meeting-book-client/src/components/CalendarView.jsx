@@ -32,6 +32,8 @@ const handleEventClick = (info) => {
 
   return (
     <div className="calendar-wrapper">
+  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+
       <div className="calendar-page">
         <div className="calendar-header">
           <div id="calendar-toolbar" />
@@ -75,6 +77,8 @@ const handleEventClick = (info) => {
         </div>
       </div>
     </div>
+        </div>
+
   );
 }
 

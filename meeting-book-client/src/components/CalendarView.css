@@ -1,31 +1,4 @@
-.calendar-wrapper {
-  max-width: 500px;
-  margin: 40px auto;
-  padding: 0 20px;
-  font-family: 'Segoe UI', sans-serif;
-}
-
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.calendar-header h2 {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0;
-  color: #2c3e50;
-}
-
-.calendar-container {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  box-sizing: border-box;
-}
+/* Base Layout */
 body {
   background-color: #f6f9fc;
   font-family: 'Segoe UI', sans-serif;
@@ -34,9 +7,167 @@ body {
   color: #333;
 }
 
-
+/* Page Titles */
 h2 {
   text-align: center;
   margin: 30px 0 10px;
   color: #333;
+}
+
+/* Calendar Wrapper */
+.calendar-wrapper {
+  max-width: 100%;
+  width: 100%;
+  padding: 0 15px;
+  margin: 40px auto;
+  box-sizing: border-box;
+}
+
+/* Calendar Header */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+/* Calendar Header Title */
+.calendar-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  color: #2c3e50;
+}
+
+/* Calendar Container */
+.calendar-container {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  overflow-x: auto;
+}
+
+/* Login Buttons Wrapper */
+.login-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}
+
+.login-wrapper button {
+  background-color: #2c3e50;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 16px;
+  min-width: 120px;
+  transition: background 0.2s ease;
+}
+
+.login-wrapper button:hover {
+  background-color: #1a252f;
+}
+
+/* Make FullCalendar more touch-friendly on all screens */
+.fc {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fc-scrollgrid {
+  min-width: 600px; /* Prevents squashing */
+}
+
+button {
+  touch-action: manipulation;
+}
+
+/* Mobile Optimization */
+@media (max-width: 600px) {
+  .calendar-container {
+    padding: 12px;
+  }
+
+  .calendar-header h2 {
+    font-size: 20px;
+  }
+
+  .fc {
+    font-size: 12px;
+  }
+
+  .login-wrapper {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .login-wrapper button {
+    width: 80%;
+    max-width: 250px;
+  }
+}
+
+/* Extra Small Screens (phone) */
+@media (max-width: 480px) {
+  .calendar-wrapper {
+    padding-bottom: 40px;
+  }
+
+  .fc-toolbar {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .fc-toolbar-chunk {
+    text-align: center;
+  }
+
+  .fc-button {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .fc-col-header-cell {
+    font-size: 12px;
+  }
+
+  .fc-timegrid-slot-label {
+    font-size: 12px;
+  }
+
+  .fc-event {
+    font-size: 12px;
+    padding: 2px;
+  }
+
+  /* Improve clickability of time slots */
+  .fc-timegrid-slot {
+    min-height: 50px !important;
+  }
+
+  .fc-daygrid-day-frame,
+  .fc-timegrid-col {
+    padding: 6px 4px;
+  }
+
+  /* Make modals (like form-container) responsive */
+  .form-container {
+    width: 95vw !important;
+    max-width: none !important;
+    padding: 20px;
+    border-radius: 10px;
+  }
+
+  .form-container input,
+  .form-container select {
+    font-size: 14px;
+  }
 }
