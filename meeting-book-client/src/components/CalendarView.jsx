@@ -45,6 +45,10 @@ const handleEventClick = (info) => {
             schedulerLicenseKey="GPL-My-Project-Is-Open-Source"
             slotMinTime="08:00:00"
             slotMaxTime="18:00:00"
+             longPressDelay={100} // ⏱️ Register taps faster (default is 1000ms on mobile)
+  selectMinDistance={1} // Allow short taps without needing to drag
+    selectAllow={() => true} // allow even small selections
+
             allDaySlot={false}
             selectable={true}
             selectMirror={true}

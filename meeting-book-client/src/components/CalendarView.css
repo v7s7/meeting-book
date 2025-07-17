@@ -178,3 +178,8 @@ button {
     font-size: 14px;
   }
 }
+@media (max-width: 600px) {
+  .fc-timegrid-slot {
+    min-height: 60px !important;
+  }
+}

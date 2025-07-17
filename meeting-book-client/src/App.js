@@ -4,6 +4,7 @@ import BookingForm from './components/BookingForm';
 import { auth, db } from './utils/firebase';
 import { setDoc } from 'firebase/firestore';
 import { getDoc } from 'firebase/firestore';
+import ManualBookingForm from './components/ManualBookingForm';
 
 import './App.css';
 import {
@@ -30,6 +31,8 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 const [showUserLogin, setShowUserLogin] = useState(false);
 const [userLastBooking, setUserLastBooking] = useState(null);
+const [manualBookingOpen, setManualBookingOpen] = useState(false);
+
 
   useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -90,13 +93,21 @@ const [userLastBooking, setUserLastBooking] = useState(null);
 
 
   const handleSlotSelect = (info) => {
-  console.log("HANDLE SLOT SELECT:", info);
+  const start = new Date(info.start);
+  let end = new Date(info.end);
+
+  // If user didn't drag — manually set a 30-minute slot
+  if (start.getTime() === end.getTime()) {
+    end = new Date(start.getTime() + 30 * 60 * 1000); // 30 mins
+  }
+
   setSelectedSlot({
-    start: info.start,
-    end: info.end,
-    resourceId: info.resourceId,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    resourceId: info.resource?.id || 'Room 1',
   });
 };
+
 
 
   const handleSubmitBooking = async (formData, calculatedEnd) => {
@@ -173,39 +184,47 @@ if (currentUser?.uid) {
   };
 
   return (
-    <div>
-<div className="login-wrapper">
-        
-       {currentUser ? (
-  <button onClick={handleLogout}>Logout</button>
-) : (
-  <>
-    <button onClick={() => setShowUserLogin(true)}>User Login</button>
-    <button onClick={handleAdminLogin}>Admin Sign In</button>
-  </>
-)}
-
-</div>
-
-      <CalendarView
-        events={events}
-        onSelectSlot={handleSlotSelect}
-        onDeleteEvent={handleEventDelete}
-        isAdmin={isAdmin}
-      />
-
-      <BookingForm
-  slot={selectedSlot}
-  events={events}
-  onClose={handleCloseForm}
-  onSubmit={handleSubmitBooking}
-  lastUsedData={userLastBooking}
-/>
-
-      {showUserLogin && <UserAuthForm onClose={() => setShowUserLogin(false)} />}
-
+  <div>
+    <div className="login-wrapper">
+      {currentUser ? (
+        <button onClick={handleLogout}>Logout</button>
+      ) : (
+        <>
+          <button onClick={() => setShowUserLogin(true)}>User Login</button>
+          <button onClick={handleAdminLogin}>Admin Sign In</button>
+          <button onClick={() => setManualBookingOpen(true)}>Book Manually</button>
+        </>
+      )}
     </div>
-  );
+
+    <CalendarView
+      events={events}
+      onSelectSlot={handleSlotSelect}
+      onDeleteEvent={handleEventDelete}
+      isAdmin={isAdmin}
+    />
+
+    <BookingForm
+      slot={selectedSlot}
+      events={events}
+      onClose={handleCloseForm}
+      onSubmit={handleSubmitBooking}
+      lastUsedData={userLastBooking}
+    />
+
+    {showUserLogin && (
+      <UserAuthForm onClose={() => setShowUserLogin(false)} />
+    )}
+
+    {manualBookingOpen && (
+      <ManualBookingForm
+        onClose={() => setManualBookingOpen(false)}
+        onSubmit={(slot) => setSelectedSlot(slot)}
+      />
+    )}
+  </div>
+);
+
 }
 
 export default App;
