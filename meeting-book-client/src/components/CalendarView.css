@@ -43,10 +43,19 @@ h2 {
 .calendar-container {
   background: #ffffff;
   border-radius: 12px;
-  padding: 20px;
+  padding: 10px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
-  overflow-x: auto;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* FullCalendar grid responsiveness */
+.fc-scrollgrid {
+  min-width: unset;
+  width: 100%;
 }
 
 /* Login Buttons Wrapper */
@@ -80,10 +89,6 @@ h2 {
 .fc {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-}
-
-.fc-scrollgrid {
-  min-width: 600px; /* Prevents squashing */
 }
 
 button {
