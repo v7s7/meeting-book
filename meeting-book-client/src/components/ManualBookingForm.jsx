@@ -50,7 +50,10 @@ function ManualBookingForm({ onClose, onSubmit }) {
             ))}
           </select>
 
-          <button type="submit">Continue</button>
+<div className="form-actions">
+  <button type="submit">Continue</button>
+  <button type="button" onClick={onClose}>Cancel</button>
+</div>
         </form>
       </div>
     </div>

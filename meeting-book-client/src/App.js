@@ -185,17 +185,20 @@ if (currentUser?.uid) {
 
   return (
   <div>
-    <div className="login-wrapper">
-      {currentUser ? (
-        <button onClick={handleLogout}>Logout</button>
-      ) : (
-        <>
-          <button onClick={() => setShowUserLogin(true)}>User Login</button>
-          <button onClick={handleAdminLogin}>Admin Sign In</button>
-          <button onClick={() => setManualBookingOpen(true)}>Book Manually</button>
-        </>
-      )}
-    </div>
+   <div className="login-wrapper">
+  {currentUser ? (
+    <button onClick={handleLogout}>Logout</button>
+  ) : (
+    <>
+      <button onClick={() => setShowUserLogin(true)}>User Login</button>
+      <button onClick={handleAdminLogin}>Admin Sign In</button>
+    </>
+  )}
+
+  {/* ✅ Show this for everyone */}
+  <button onClick={() => setManualBookingOpen(true)}>Book Manually</button>
+</div>
+
 
     <CalendarView
       events={events}
