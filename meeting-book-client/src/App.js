@@ -104,44 +104,69 @@ const [manualBookingOpen, setManualBookingOpen] = useState(false);
   setSelectedSlot({
     start: start.toISOString(),
     end: end.toISOString(),
-    resourceId: info.resource?.id || 'Room 1',
+resourceId: info.resource?.id || info.resourceId || 'Room 1',
   });
 };
 
 
 
-  const handleSubmitBooking = async (formData, calculatedEnd) => {
-    const userId = currentUser?.uid || 'guest';
+const handleSubmitBooking = async (formData, calculatedEnd) => {
+  const userId = currentUser?.uid || 'guest';
 
- await addDoc(collection(db, 'bookings'), {
-  name: formData.name,
-  cpr: formData.cpr,
-  phone: formData.phone,
-  department: formData.department,
-  room: selectedSlot.resourceId,
-  start: selectedSlot.start,
-  end: calculatedEnd,
-  userId
-});
-
-// ✅ Save user profile
-if (currentUser?.uid) {
-  try {
-  await setDoc(doc(db, 'users', currentUser.uid), {
+  // 1. Save to Firestore
+  await addDoc(collection(db, 'bookings'), {
     name: formData.name,
     cpr: formData.cpr,
     phone: formData.phone,
-    department: formData.department
+    department: formData.department,
+    room: selectedSlot.resourceId,
+    start: selectedSlot.start,
+    end: calculatedEnd,
+    userId
   });
-  console.log("✅ Profile saved successfully");
-} catch (err) {
-  console.error("❌ Failed to save profile:", err);
-}
 
-}
+  // 2. Save profile
+  if (currentUser?.uid) {
+    try {
+      await setDoc(doc(db, 'users', currentUser.uid), {
+        name: formData.name,
+        cpr: formData.cpr,
+        phone: formData.phone,
+        department: formData.department
+      });
+      console.log("✅ Profile saved successfully");
+    } catch (err) {
+      console.error("❌ Failed to save profile:", err);
+    }
+  }
 
-    setSelectedSlot(null);
-  };
+  // 3. ✅ Send to Google Sheets via n8n webhook
+  try {
+    await fetch('http://localhost:5678/webhook-test/eda4e88f-7000-43c3-be07-a98a4f313027', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    name: formData.name,
+    cpr: formData.cpr,
+    phone: formData.phone,
+    department: formData.department,
+    room: selectedSlot.resourceId,
+    start: selectedSlot.start,
+    end: calculatedEnd,
+    userId,
+  }),
+});
+
+
+    console.log("✅ Sent to Google Sheets");
+  } catch (err) {
+    console.error("❌ Failed to send to Google Sheets:", err);
+  }
+
+  // 4. Clear form
+  setSelectedSlot(null);
+};
+
 
   const handleEventDelete = async (eventId) => {
   const event = events.find(e => e.id === eventId);
