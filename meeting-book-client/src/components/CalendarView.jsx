@@ -3,48 +3,24 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
-import { updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../utils/firebase';
+import BookingActionModal from './BookingActionModal';
 import './CalendarView.css';
 
 function CalendarView({ events, onSelectSlot, isAdmin, currentUser }) {
+  const [selectedEvent, setSelectedEvent] = React.useState(null);
 
- const handleEventClick = async (info) => {
-  const eventId = info.event.id;
-  const eventData = events.find((e) => e.id === eventId);
-  if (!eventData) return;
-
-  if (isAdmin) {
-    if (eventData.status === "pending") {
-      if (window.confirm("Approve this booking?")) {
-        await updateDoc(doc(db, 'bookings', eventId), { status: "approved" });
-
-        // Remove all other pending bookings in the same slot
-        const overlappingPending = events.filter(e =>
-          e.id !== eventId &&
-          e.status === "pending" &&
-          e.room === eventData.room &&
-          new Date(e.start) < new Date(eventData.end) &&
-          new Date(e.end) > new Date(eventData.start)
-        );
-        for (const booking of overlappingPending) {
-          await deleteDoc(doc(db, 'bookings', booking.id));
-        }
-      }
+  const handleEventClick = (info) => {
+    if (isAdmin) {
+      const eventData = events.find((e) => e.id === info.event.id);
+      setSelectedEvent(eventData);
     } else {
-      if (window.confirm("Delete this booking?")) {
-        await deleteDoc(doc(db, 'bookings', eventId));
-      }
+      alert("You can only delete your own bookings.");
     }
-  } else {
-    alert("You can only delete your own bookings.");
-  }
-};
+  };
 
   const renderEventContent = (arg) => {
     const { status } = arg.event.extendedProps;
     const isApproved = status === "approved";
-
     return (
       <div className="event-container">
         <div className={`event-content ${isApproved ? "approved" : "pending"}`}>
@@ -107,6 +83,14 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser }) {
           </div>
         </div>
       </div>
+
+      {isAdmin && selectedEvent && (
+        <BookingActionModal
+          eventData={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          events={events}
+        />
+      )}
     </div>
   );
 }
