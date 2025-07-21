@@ -15,13 +15,16 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
 
   // Auto-fill from lastUsedData but allow edits except name
   useEffect(() => {
-    if (lastUsedData) {
-      setFormData(prev => ({
-        ...prev,
-        ...lastUsedData
-      }));
-    }
-  }, [lastUsedData]);
+  if (lastUsedData) {
+    setFormData(prev => ({
+      ...prev,
+      ...lastUsedData,
+      // Keep current department if user started typing
+      department: prev.department || lastUsedData.department || ''
+    }));
+  }
+}, [lastUsedData]);
+
 
   useEffect(() => {
     if (!slot || !slot.start || !slot.end) return;

@@ -17,7 +17,7 @@ import './App.css';
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
-const ADMIN_EMAILS = ["a.alkubaesy@swd.bh", "admin2@swd.bh", "admin3@swd.bh"];// CHANGE THE EMAIL HERE 
+const ADMIN_EMAILS = ["a.alkubaesy@swd.bh", "admin2@swd.bh", "admin3@swd.bh"];
 
 async function getUserProfile(instance, account) {
   const request = { scopes: ["User.Read"], account: account };
@@ -56,21 +56,6 @@ function App() {
   const [userLastBooking, setUserLastBooking] = useState(null);
   const [manualBookingOpen, setManualBookingOpen] = useState(false);
 
-  // Test Firestore permissions
-  useEffect(() => {
-    async function testFirestore() {
-      try {
-        await addDoc(collection(db, "testCollection"), { test: "hello" });
-        console.log("✅ Write test succeeded");
-        const snapshot = await getDocs(collection(db, "testCollection"));
-        console.log("✅ Read test succeeded. Docs count:", snapshot.size);
-      } catch (error) {
-        console.error("❌ Firestore test error:", error);
-      }
-    }
-    testFirestore();
-  }, []);
-
   // Fetch Microsoft user profile after login
   useEffect(() => {
     if (activeAccount) {
@@ -88,21 +73,22 @@ function App() {
             return;
           }
 
-          setCurrentUser({
+          setCurrentUser(prev => ({
+            ...prev,
             username: profile.userPrincipalName || "",
             name: profile.displayName || "Unknown User",
-            department: profile.department || "",
-            phone: profile.mobilePhone || "",
-          });
+            // Keep previous department if Microsoft profile doesn't provide it
+            department: prev?.department || profile.department || "",
+            phone: profile.mobilePhone || prev?.phone || "",
+          }));
 
-          // Check if user is the admin
-setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
+          setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
         })
         .catch(err => console.error("Profile fetch failed:", err));
     }
   }, [activeAccount, instance]);
 
-  // Load saved user data
+  // Load saved user data from Firestore
   useEffect(() => {
     async function loadUserData() {
       if (!currentUser?.username) return;
@@ -110,7 +96,14 @@ setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
         const userDocRef = doc(db, 'users', currentUser.username);
         const userSnap = await getDoc(userDocRef);
         if (userSnap.exists()) {
-          setUserLastBooking(userSnap.data());
+          const data = userSnap.data();
+          setUserLastBooking(data);
+
+          // Always prioritize Firestore department
+          setCurrentUser(prev => ({
+            ...prev,
+            department: data.department || prev?.department || ""
+          }));
         }
       } catch (err) {
         console.error("Failed to fetch user data:", err);
@@ -165,22 +158,21 @@ setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
           return;
         }
 
-        // Allow only @swd.bh emails
         if (!profile.userPrincipalName.endsWith("@swd.bh")) {
           alert("Access denied. Only @swd.bh emails are allowed.");
           handleLogout();
           return;
         }
 
-        setCurrentUser({
+        setCurrentUser(prev => ({
+          ...prev,
           username: profile.userPrincipalName || "",
           name: profile.displayName || "Unknown User",
-          department: profile.department || "",
-          phone: profile.mobilePhone || "",
-        });
+          department: prev?.department || profile.department || "",
+          phone: profile.mobilePhone || prev?.phone || "",
+        }));
 
-        // Check admin
-        setIsAdmin(profile.userPrincipalName === ADMIN_EMAILS);
+        setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
       })
       .catch(err => {
         console.error("Login failed:", err);
@@ -195,7 +187,6 @@ setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
     });
   };
 
-  // Slot selection
   const handleSlotSelect = (info) => {
     const start = new Date(info.start);
     let end = new Date(info.end);
@@ -249,12 +240,18 @@ setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
       department: formData.department || currentUser.department || ""
     });
 
+    // Update local currentUser with latest department
+    setCurrentUser(prev => ({
+      ...prev,
+      department: formData.department || currentUser.department || ""
+    }));
+
     setSelectedSlot(null);
   };
 
   // Delete event (Admin only)
   const handleEventDelete = async (eventId) => {
-    if (!isAdmin) return; 
+    if (!isAdmin) return;
     try {
       await deleteDoc(doc(db, 'bookings', eventId));
     } catch (err) {
@@ -265,7 +262,6 @@ setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
 
   return (
     <div>
-      {/* Header */}
       <header style={{
         background: "#2e3b4e",
         color: "#fff",
@@ -329,12 +325,16 @@ setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
         events={events}
         onClose={() => setSelectedSlot(null)}
         onSubmit={handleSubmitBooking}
-        lastUsedData={userLastBooking || {
-          name: currentUser?.name || "",
-          phone: currentUser?.phone || "",
-          department: currentUser?.department || "",
-          cpr: ""
-        }}
+        lastUsedData={
+          userLastBooking
+            ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name }
+            : {
+                name: currentUser?.name || "",
+                phone: currentUser?.phone || "",
+                department: currentUser?.department || "",
+                cpr: ""
+              }
+        }
       />
 
       {manualBookingOpen && (
