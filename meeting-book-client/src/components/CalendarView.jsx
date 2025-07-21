@@ -9,25 +9,37 @@ import './CalendarView.css';
 
 function CalendarView({ events, onSelectSlot, isAdmin, currentUser }) {
 
-  const handleEventClick = async (info) => {
-    const eventId = info.event.id;
-    const eventData = events.find((e) => e.id === eventId);
-    if (!eventData) return;
+ const handleEventClick = async (info) => {
+  const eventId = info.event.id;
+  const eventData = events.find((e) => e.id === eventId);
+  if (!eventData) return;
 
-    if (isAdmin) {
-      if (eventData.status === "pending") {
-        if (window.confirm("Approve this booking?")) {
-          await updateDoc(doc(db, 'bookings', eventId), { status: "approved" });
-        }
-      } else {
-        if (window.confirm("Delete this booking?")) {
-          await deleteDoc(doc(db, 'bookings', eventId));
+  if (isAdmin) {
+    if (eventData.status === "pending") {
+      if (window.confirm("Approve this booking?")) {
+        await updateDoc(doc(db, 'bookings', eventId), { status: "approved" });
+
+        // Remove all other pending bookings in the same slot
+        const overlappingPending = events.filter(e =>
+          e.id !== eventId &&
+          e.status === "pending" &&
+          e.room === eventData.room &&
+          new Date(e.start) < new Date(eventData.end) &&
+          new Date(e.end) > new Date(eventData.start)
+        );
+        for (const booking of overlappingPending) {
+          await deleteDoc(doc(db, 'bookings', booking.id));
         }
       }
     } else {
-      alert("You can only delete your own bookings.");
+      if (window.confirm("Delete this booking?")) {
+        await deleteDoc(doc(db, 'bookings', eventId));
+      }
     }
-  };
+  } else {
+    alert("You can only delete your own bookings.");
+  }
+};
 
   const renderEventContent = (arg) => {
     const { status } = arg.event.extendedProps;
