@@ -5,8 +5,7 @@ body {
   margin: 0;
   padding: 0;
   color: #333;
-  overscroll-behavior: contain; /* optional for mobile bounce */
-
+  overscroll-behavior: contain;
 }
 
 /* Page Titles */
@@ -25,6 +24,12 @@ h2 {
   box-sizing: border-box;
 }
 
+/* Scroll container for calendar */
+.calendar-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Calendar Header */
 .calendar-header {
   display: flex;
@@ -33,7 +38,6 @@ h2 {
   margin-bottom: 15px;
 }
 
-/* Calendar Header Title */
 .calendar-header h2 {
   font-size: 24px;
   font-weight: 600;
@@ -58,6 +62,50 @@ h2 {
 .fc-scrollgrid {
   min-width: unset;
   width: 100%;
+}
+
+/* Override FullCalendar default event background and borders */
+.fc-event {
+  background: none !important;
+  border: none !important;
+  color: inherit !important;
+  box-shadow: none !important;
+    pointer-events: none !important;
+
+}
+
+/* Event Styles */
+.event-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.event-content {
+  height: 100%;
+  color: #fff;
+  font-size: 0.8em;
+  line-height: 1.1em;
+  overflow: hidden;
+  border-radius: 3px;
+  padding: 1px 2px;
+  pointer-events: auto;
+}
+
+.event-content.approved {
+  width: 100%;
+  background: #3498db;
+  border: none;
+}
+
+.event-content.pending {
+  width: 30%;
+  background: linear-gradient(to right, rgba(128, 128, 128, 0.5), rgba(128, 128, 128, 0.3));
+  border: 1px dashed rgba(255, 255, 255, 0.7);
 }
 
 /* Login Buttons Wrapper */
@@ -87,7 +135,39 @@ h2 {
   background-color: #1a252f;
 }
 
-/* Make FullCalendar more touch-friendly on all screens */
+/* App Header */
+.app-header {
+  background: #2e3b4e;
+  color: #fff;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.app-header h2 {
+  color: #fff;
+}
+
+.btn-login {
+  background: #3498db;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn-logout {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* Touch-friendly adjustments */
 .fc {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -151,11 +231,11 @@ button {
   }
 
   .fc-event {
-    font-size: 12px;
-    padding: 2px;
+    width: auto !important;
+    display: block !important;
+    position: absolute !important;
   }
 
-  /* Improve clickability of time slots */
   .fc-timegrid-slot {
     min-height: 50px !important;
   }
@@ -165,7 +245,6 @@ button {
     padding: 6px 4px;
   }
 
-  /* Make modals (like form-container) responsive */
   .form-container {
     width: 95vw !important;
     max-width: none !important;
@@ -178,6 +257,7 @@ button {
     font-size: 14px;
   }
 }
+
 @media (max-width: 600px) {
   .fc-timegrid-slot {
     min-height: 60px !important;

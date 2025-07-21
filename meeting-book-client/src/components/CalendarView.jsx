@@ -3,86 +3,99 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
-import { getAuth } from 'firebase/auth';
+import { updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../utils/firebase';
 import './CalendarView.css';
 
-function CalendarView({ events, onSelectSlot, onDeleteEvent, isAdmin }) {
-  const auth = getAuth();
-  const currentUserId = auth.currentUser?.uid;
+function CalendarView({ events, onSelectSlot, isAdmin, currentUser }) {
 
-const handleEventClick = (info) => {
-  const eventUserId = info.event.extendedProps.userId;
-  const isOwner = eventUserId === currentUserId;
+  const handleEventClick = async (info) => {
+    const eventId = info.event.id;
+    const eventData = events.find((e) => e.id === eventId);
+    if (!eventData) return;
 
-  if (isOwner || isAdmin) {
-    const room = info.event.extendedProps.room || info.event.getResources?.()[0]?.id || 'this room';
-    const time = new Date(info.event.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const confirmed = window.confirm(
-      `Delete this booking at ${time} in ${room}?`
-    );
-
-    if (confirmed) {
-      onDeleteEvent(info.event.id);
+    if (isAdmin) {
+      if (eventData.status === "pending") {
+        if (window.confirm("Approve this booking?")) {
+          await updateDoc(doc(db, 'bookings', eventId), { status: "approved" });
+        }
+      } else {
+        if (window.confirm("Delete this booking?")) {
+          await deleteDoc(doc(db, 'bookings', eventId));
+        }
+      }
+    } else {
+      alert("You can only delete your own bookings.");
     }
-  }
-};
+  };
 
+  const renderEventContent = (arg) => {
+    const { status } = arg.event.extendedProps;
+    const isApproved = status === "approved";
 
+    return (
+      <div className="event-container">
+        <div className={`event-content ${isApproved ? "approved" : "pending"}`}>
+          {arg.event.title} {!isApproved && "(Pending)"}
+        </div>
+      </div>
+    );
+  };
 
   return (
-<div className="calendar-wrapper" style={{ width: '100%' }}>
-  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-
-      <div className="calendar-page">
-        <div className="calendar-header">
-          <div id="calendar-toolbar" />
-        </div>
-        <div className="calendar-container">
-          <FullCalendar
-            plugins={[timeGridPlugin, interactionPlugin, resourceTimeGridPlugin]}
-            initialView="resourceTimeGridDay"
-            schedulerLicenseKey="GPL-My-Project-Is-Open-Source"
-            slotMinTime="08:00:00"
-            slotMaxTime="18:00:00"
-             longPressDelay={100} // ⏱️ Register taps faster (default is 1000ms on mobile)
-  selectMinDistance={1} // Allow short taps without needing to drag
-    selectAllow={() => true} // allow even small selections
-
-            allDaySlot={false}
-            selectable={true}
-            selectMirror={true}
-            height="61vh"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: ''
-            }}
-            resources={[
-              { id: 'Room 1', title: 'Room 1' },
-              { id: 'Room 2', title: 'Room 2' },
-              { id: 'Room 3', title: 'Room 3' }
-            ]}
-            events={events.map(event => ({
-              ...event,
-              resourceId: event.room || 'Room 1'  // Default to Room A if not specified
-            }))}
-            select={(info) => {
-  console.log("SELECT FIRED:", info);
-  console.log("Resource:", info.resource?.id);
-  onSelectSlot({
-    start: info.startStr,
-    end: info.endStr,
-    resourceId: info.resource?.id || 'Room 1',  // fallback
-  });
-}}
-            eventClick={handleEventClick}
-          />
+    <div className="calendar-wrapper">
+      <div className="calendar-scroll">
+        <div className="calendar-page">
+          <div className="calendar-header">
+            <div id="calendar-toolbar" />
+            {currentUser && (
+              <div className="user-info">
+                Logged in as: <strong>{currentUser.name}</strong>
+              </div>
+            )}
+          </div>
+          <div className="calendar-container">
+            <FullCalendar
+              plugins={[timeGridPlugin, interactionPlugin, resourceTimeGridPlugin]}
+              initialView="resourceTimeGridDay"
+              schedulerLicenseKey="GPL-My-Project-Is-Open-Source"
+              slotMinTime="08:00:00"
+              slotMaxTime="18:00:00"
+              longPressDelay={100}
+              selectMinDistance={1}
+              selectAllow={() => true}
+              allDaySlot={false}
+              selectable={true}
+              selectMirror={true}
+              height="61vh"
+              headerToolbar={{
+                left: 'prev,next today',
+                center: 'title',
+                right: ''
+              }}
+              resources={[
+                { id: 'Room 1', title: 'Room 1' },
+                { id: 'Room 2', title: 'Room 2' },
+                { id: 'Room 3', title: 'Room 3' }
+              ]}
+              events={events.map(event => ({
+                ...event,
+                resourceId: event.room || 'Room 1',
+              }))}
+              eventContent={renderEventContent}
+              select={(info) => {
+                onSelectSlot({
+                  start: info.startStr,
+                  end: info.endStr,
+                  resourceId: info.resource?.id || 'Room 1',
+                });
+              }}
+              eventClick={handleEventClick}
+            />
+          </div>
         </div>
       </div>
     </div>
-        </div>
-
   );
 }
 

@@ -1,250 +1,355 @@
 import React, { useState, useEffect } from 'react';
 import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
-import { auth, db } from './utils/firebase';
-import { setDoc } from 'firebase/firestore';
-import { getDoc } from 'firebase/firestore';
 import ManualBookingForm from './components/ManualBookingForm';
-
-import './App.css';
+import { db } from './utils/firebase';
 import {
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut,
-} from 'firebase/auth';
-import {
+  setDoc,
   collection,
   addDoc,
   onSnapshot,
   deleteDoc,
   doc,
+  getDocs,
+  getDoc
 } from 'firebase/firestore';
-import UserAuthForm from './components/UserAuthForm';
+import './App.css';
+import { useMsal } from "@azure/msal-react";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
-
-const ADMIN_UIDS = ['NvC4POvuBtYbbkDvd8xTmvwVFq33']; // Replace with your actual admin UID
+async function getUserProfile(instance, account) {
+  const request = { scopes: ["User.Read"], account: account };
+  try {
+    const response = await instance.acquireTokenSilent(request);
+    const userInfo = await fetch("https://graph.microsoft.com/v1.0/me", {
+      headers: { Authorization: `Bearer ${response.accessToken}` },
+    });
+    return userInfo.json();
+  } catch (error) {
+    console.error("Silent token acquisition failed:", error);
+    if (error instanceof InteractionRequiredAuthError) {
+      try {
+        const response = await instance.acquireTokenPopup(request);
+        const userInfo = await fetch("https://graph.microsoft.com/v1.0/me", {
+          headers: { Authorization: `Bearer ${response.accessToken}` },
+        });
+        return userInfo.json();
+      } catch (popupError) {
+        console.error("Popup token acquisition failed:", popupError);
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+}
 
 function App() {
+  const { instance, accounts } = useMsal();
+  const [activeAccount, setActiveAccount] = useState(instance.getActiveAccount() || accounts[0]);
   const [events, setEvents] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-const [showUserLogin, setShowUserLogin] = useState(false);
-const [userLastBooking, setUserLastBooking] = useState(null);
-const [manualBookingOpen, setManualBookingOpen] = useState(false);
+  const [userLastBooking, setUserLastBooking] = useState(null);
+  const [manualBookingOpen, setManualBookingOpen] = useState(false);
 
-
+  // Test Firestore permissions
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    setCurrentUser(user);
-    setIsAdmin(user && ADMIN_UIDS.includes(user.uid));
-
-   if (user) {
-  const ref = doc(db, 'users', user.uid);
-  console.log("📥 Trying to get user profile for UID:", user.uid);
-
-  try {
-    const userDoc = await getDoc(ref);
-    if (userDoc.exists()) {
-      console.log("✅ Profile loaded:", userDoc.data());
-      setUserLastBooking(userDoc.data());
-    } else {
-      console.log("⚠️ Profile not found for user:", user.uid);
-    }
-  } catch (err) {
-    console.error("❌ Failed to get user profile:", err);
-  }
-}
-
-  });
-
-  return () => unsubscribe();
-}, []);
-
-  useEffect(() => {
-  const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-    const data = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    setEvents(
-      data.map(event => ({
-        ...event,
-        title: `${event.name} – ${event.department}`
-      }))
-    );
-
-    // 🔍 Save latest booking info for current user
-    if (currentUser) {
-      const userBookings = data
-        .filter(b => b.userId === currentUser.uid)
-        .sort((a, b) => new Date(b.start) - new Date(a.start)); // latest first
-
-      if (userBookings.length > 0) {
-        const { name, cpr, phone, department } = userBookings[0];
-        setUserLastBooking({ name, cpr, phone, department });
+    async function testFirestore() {
+      try {
+        await addDoc(collection(db, "testCollection"), { test: "hello" });
+        console.log("✅ Write test succeeded");
+        const snapshot = await getDocs(collection(db, "testCollection"));
+        console.log("✅ Read test succeeded. Docs count:", snapshot.size);
+      } catch (error) {
+        console.error("❌ Firestore test error:", error);
       }
     }
-  });
+    testFirestore();
+  }, []);
 
-  return () => unsub();
-}, [currentUser]);
+  // Fetch Microsoft user profile after login
+  useEffect(() => {
+    if (activeAccount) {
+      getUserProfile(instance, activeAccount)
+        .then(profile => {
+          if (!profile || !profile.userPrincipalName) {
+            console.error("Failed to retrieve profile or userPrincipalName missing.");
+            return;
+          }
 
+          setCurrentUser({
+            username: profile.userPrincipalName || "",
+            name: profile.displayName || "Unknown User",
+            department: profile.department || "",  // Empty if not provided
+            phone: profile.mobilePhone || "",
+          });
 
-  const handleSlotSelect = (info) => {
-  const start = new Date(info.start);
-  let end = new Date(info.end);
+          setIsAdmin((profile.userPrincipalName || "").endsWith("@swd.bh"));
+        })
+        .catch(err => console.error("Profile fetch failed:", err));
+    }
+  }, [activeAccount, instance]);
 
-  // If user didn't drag — manually set a 30-minute slot
-  if (start.getTime() === end.getTime()) {
-    end = new Date(start.getTime() + 30 * 60 * 1000); // 30 mins
-  }
+  // Load saved user data
+  useEffect(() => {
+    async function loadUserData() {
+      if (!currentUser?.username) return;
 
-  setSelectedSlot({
-    start: start.toISOString(),
-    end: end.toISOString(),
-resourceId: info.resource?.id || info.resourceId || 'Room 1',
-  });
-};
+      try {
+        const userDocRef = doc(db, 'users', currentUser.username);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          setUserLastBooking(userSnap.data());
+        }
+      } catch (err) {
+        console.error("Failed to fetch user data:", err);
+      }
+    }
+    loadUserData();
+  }, [currentUser]);
 
+  // Firestore: Load bookings
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
+      setEvents(
+        data.map((event) => ({
+          ...event,
+          title: event.department
+            ? `${event.name} – ${event.department}`
+            : event.name,
+        }))
+      );
 
-const handleSubmitBooking = async (formData, calculatedEnd) => {
-  const userId = currentUser?.uid || 'guest';
+      if (currentUser) {
+        const userBookings = data
+          .filter((b) => b.userId === currentUser.username)
+          .sort((a, b) => new Date(b.start) - new Date(a.start));
 
-  // 1. Save to Firestore
-  await addDoc(collection(db, 'bookings'), {
-  name: formData.name,
-  cpr: formData.cpr,
-  phone: formData.phone,
-  department: formData.department,
-  room: selectedSlot.resourceId,
-  start: selectedSlot.start,
-  end: calculatedEnd,
-  userId
-});
+        if (userBookings.length > 0) {
+          const { name, cpr, phone, department } = userBookings[0];
+          setUserLastBooking({ name, cpr, phone, department });
+        }
+      }
+    });
 
-if (currentUser?.uid) {
-  await setDoc(doc(db, 'users', currentUser.uid), {
-    name: formData.name,
-    cpr: formData.cpr,
-    phone: formData.phone,
-    department: formData.department
-  });
-}
+    return () => unsub();
+  }, [currentUser]);
 
-setSelectedSlot(null); // Clear form early
+  // Microsoft Login
+  const handleMicrosoftLogin = () => {
+    instance.loginPopup({ scopes: ["User.Read"] })
+      .then(response => {
+        instance.setActiveAccount(response.account);
+        setActiveAccount(response.account);
+        return getUserProfile(instance, response.account);
+      })
+      .then(profile => {
+        if (!profile) {
+          alert("Failed to fetch Microsoft profile. Please try again.");
+          return;
+        }
 
-// ✅ Send to Sheets asynchronously
-fetch('http://localhost:5000/add-booking', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    name: formData.name,
-    cpr: formData.cpr,
-    phone: formData.phone,
-    department: formData.department,
-    room: selectedSlot.resourceId,
-    start: selectedSlot.start,
-    end: calculatedEnd,
-    userId,
-  }),
-}).then(() => {
-  console.log("✅ Sent to Google Sheets");
-}).catch(err => {
-  console.error("❌ Failed to send to Google Sheets:", err);
-});
+        setCurrentUser({
+          username: profile.userPrincipalName || "",
+          name: profile.displayName || "Unknown User",
+          department: profile.department || "",
+          phone: profile.mobilePhone || "",
+        });
 
-// ✅ Close handleSubmitBooking here
-};
-
-
-  const handleEventDelete = async (eventId) => {
-  const event = events.find(e => e.id === eventId);
-
-  const isOwner = currentUser?.uid && event?.userId === currentUser.uid;
-
-  if (!isAdmin && !isOwner) {
-    alert('You can only delete your own bookings.');
-    return;
-  }
-
- try {
-  await deleteDoc(doc(db, 'bookings', eventId));
-} catch (err) {
-  console.error('Error deleting:', err);
-  alert('Failed to delete booking.');
-}
-
+        setIsAdmin((profile.userPrincipalName || "").endsWith("@swd.bh"));
+      })
+      .catch(err => {
+        console.error("Login failed:", err);
+        alert("Microsoft login failed: " + err.message);
+      });
   };
 
-  const handleCloseForm = () => setSelectedSlot(null);
+  const handleLogout = () => {
+    instance.logoutPopup().then(() => {
+      setCurrentUser(null);
+      setActiveAccount(null);
+    });
+  };
 
-  const handleAdminLogin = async () => {
-  const email = prompt('Enter admin email:');
-  if (!email) return;  // Exit if cancelled or empty
+  // Slot selection
+  const handleSlotSelect = (info) => {
+    const start = new Date(info.start);
+    let end = new Date(info.end);
 
-  const password = prompt('Enter password:');
-  if (!password) return;  // Exit if cancelled or empty
+    if (start.getTime() === end.getTime()) {
+      end = new Date(start.getTime() + 30 * 60 * 1000);
+    }
 
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (err) {
-    alert('Login failed: ' + err.message);
-  }
-};
+    setSelectedSlot({
+      start: start.toISOString(),
+      end: end.toISOString(),
+      resourceId: info.resource?.id || info.resourceId || 'Room 1',
+    });
+  };
 
+  // Submit booking (with phone saving)
+  const handleSubmitBooking = async (formData, calculatedEnd) => {
+    if (!currentUser) {
+      alert("Please log in with your Microsoft account to book.");
+      return;
+    }
 
-  const handleLogout = async () => {
-    await signOut(auth);
+    const userId = currentUser.username;
+    const userName = currentUser.name;
+
+    await addDoc(collection(db, 'bookings'), {
+      name: userName,
+      cpr: formData.cpr,
+      phone: formData.phone,
+      department: formData.department || currentUser.department || "",
+      room: selectedSlot.resourceId,
+      start: selectedSlot.start,
+      end: calculatedEnd,
+      userId,
+      userEmail: userId,
+      bookedBy: userName,
+      status: "pending"
+    });
+
+    await setDoc(doc(db, 'users', userId), {
+      name: userName,
+      cpr: formData.cpr,
+      phone: formData.phone,
+      department: formData.department || currentUser.department || ""
+    });
+
+    setUserLastBooking({
+      name: userName,
+      cpr: formData.cpr,
+      phone: formData.phone,
+      department: formData.department || currentUser.department || ""
+    });
+
+    setSelectedSlot(null);
+
+    fetch('http://localhost:5000/add-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: userName,
+        cpr: formData.cpr,
+        phone: formData.phone,
+        department: formData.department || currentUser.department || "",
+        room: selectedSlot.resourceId,
+        start: selectedSlot.start,
+        end: calculatedEnd,
+        userId,
+      }),
+    })
+      .then(() => console.log("✅ Sent to Google Sheets"))
+      .catch(err => console.error("❌ Failed to send to Google Sheets:", err));
+  };
+
+  // Delete event
+  const handleEventDelete = async (eventId) => {
+    const event = events.find((e) => e.id === eventId);
+    const isOwner = currentUser?.username && event?.userId === currentUser.username;
+
+    if (!isAdmin && !isOwner) {
+      alert('You can only delete your own bookings.');
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'bookings', eventId));
+    } catch (err) {
+      console.error('Error deleting:', err);
+      alert('Failed to delete booking.');
+    }
   };
 
   return (
-  <div>
-   <div className="login-wrapper">
-  {currentUser ? (
-    <button onClick={handleLogout}>Logout</button>
-  ) : (
-    <>
-      <button onClick={() => setShowUserLogin(true)}>User Login</button>
-      <button onClick={handleAdminLogin}>Admin Sign In</button>
-    </>
-  )}
+    <div>
+      {/* Header */}
+      <header style={{
+        background: "#2e3b4e",
+        color: "#fff",
+        padding: "10px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <h2 style={{ color: "white" }}>Meeting Booking System</h2>
+        {currentUser ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span>Welcome, <strong>{currentUser.name}</strong></span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: "#e74c3c",
+                color: "#fff",
+                border: "none",
+                padding: "5px 10px",
+                borderRadius: "5px",
+                cursor: "pointer"
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleMicrosoftLogin}
+            style={{
+              background: "#3498db",
+              color: "#fff",
+              border: "none",
+              padding: "5px 10px",
+              borderRadius: "5px",
+              cursor: "pointer"
+            }}
+          >
+            Login with Microsoft
+          </button>
+        )}
+      </header>
 
-  {/* ✅ Show this for everyone */}
-  <button onClick={() => setManualBookingOpen(true)}>Book Manually</button>
-</div>
+      {/* Rest of the app */}
+      <div className="login-wrapper" style={{ margin: "10px 0" }}>
+        <button onClick={() => setManualBookingOpen(true)}>Book Manually</button>
+      </div>
 
-
-    <CalendarView
-      events={events}
-      onSelectSlot={handleSlotSelect}
-      onDeleteEvent={handleEventDelete}
-      isAdmin={isAdmin}
-    />
-
-    <BookingForm
-      slot={selectedSlot}
-      events={events}
-      onClose={handleCloseForm}
-      onSubmit={handleSubmitBooking}
-      lastUsedData={userLastBooking}
-    />
-
-    {showUserLogin && (
-      <UserAuthForm onClose={() => setShowUserLogin(false)} />
-    )}
-
-    {manualBookingOpen && (
-      <ManualBookingForm
-        onClose={() => setManualBookingOpen(false)}
-        onSubmit={(slot) => setSelectedSlot(slot)}
+      <CalendarView
+        events={events}
+        onSelectSlot={handleSlotSelect}
+        onDeleteEvent={handleEventDelete}
+        isAdmin={isAdmin}
+        currentUser={currentUser}
       />
-    )}
-  </div>
-);
 
+      <BookingForm
+        slot={selectedSlot}
+        events={events}
+        onClose={() => setSelectedSlot(null)}
+        onSubmit={handleSubmitBooking}
+        lastUsedData={userLastBooking || {
+          name: currentUser?.name || "",
+          phone: currentUser?.phone || "",
+          department: currentUser?.department || "",
+          cpr: ""
+        }}
+      />
+
+      {manualBookingOpen && (
+        <ManualBookingForm
+          onClose={() => setManualBookingOpen(false)}
+          onSubmit={(slot) => setSelectedSlot(slot)}
+        />
+      )}
+    </div>
+  );
 }
 
 export default App;
