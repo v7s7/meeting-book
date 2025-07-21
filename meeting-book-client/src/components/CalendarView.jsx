@@ -10,13 +10,11 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser }) {
   const [selectedEvent, setSelectedEvent] = React.useState(null);
 
   const handleEventClick = (info) => {
-    if (isAdmin) {
-      const eventData = events.find((e) => e.id === info.event.id);
-      setSelectedEvent(eventData);
-    } else {
-      alert("You can only delete your own bookings.");
-    }
-  };
+  if (!isAdmin) return; // Only admins can open the action modal
+  const eventData = events.find((e) => e.id === info.event.id);
+  setSelectedEvent(eventData);
+};
+
 
   const renderEventContent = (arg) => {
     const { status } = arg.event.extendedProps;

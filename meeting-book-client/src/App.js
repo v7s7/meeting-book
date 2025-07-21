@@ -17,6 +17,8 @@ import './App.css';
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
+const ADMIN_EMAILS = ["a.alkubaesy@swd.bh", "admin2@swd.bh", "admin3@swd.bh"];// CHANGE THE EMAIL HERE 
+
 async function getUserProfile(instance, account) {
   const request = { scopes: ["User.Read"], account: account };
   try {
@@ -79,14 +81,22 @@ function App() {
             return;
           }
 
+          // Allow only @swd.bh emails
+          if (!profile.userPrincipalName.endsWith("@swd.bh")) {
+            alert("Access denied. Only @swd.bh emails are allowed.");
+            handleLogout();
+            return;
+          }
+
           setCurrentUser({
             username: profile.userPrincipalName || "",
             name: profile.displayName || "Unknown User",
-            department: profile.department || "",  // Empty if not provided
+            department: profile.department || "",
             phone: profile.mobilePhone || "",
           });
 
-          setIsAdmin((profile.userPrincipalName || "").endsWith("@swd.bh"));
+          // Check if user is the admin
+setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
         })
         .catch(err => console.error("Profile fetch failed:", err));
     }
@@ -96,7 +106,6 @@ function App() {
   useEffect(() => {
     async function loadUserData() {
       if (!currentUser?.username) return;
-
       try {
         const userDocRef = doc(db, 'users', currentUser.username);
         const userSnap = await getDoc(userDocRef);
@@ -156,6 +165,13 @@ function App() {
           return;
         }
 
+        // Allow only @swd.bh emails
+        if (!profile.userPrincipalName.endsWith("@swd.bh")) {
+          alert("Access denied. Only @swd.bh emails are allowed.");
+          handleLogout();
+          return;
+        }
+
         setCurrentUser({
           username: profile.userPrincipalName || "",
           name: profile.displayName || "Unknown User",
@@ -163,7 +179,8 @@ function App() {
           phone: profile.mobilePhone || "",
         });
 
-        setIsAdmin((profile.userPrincipalName || "").endsWith("@swd.bh"));
+        // Check admin
+        setIsAdmin(profile.userPrincipalName === ADMIN_EMAILS);
       })
       .catch(err => {
         console.error("Login failed:", err);
@@ -194,7 +211,7 @@ function App() {
     });
   };
 
-  // Submit booking (with phone saving)
+  // Submit booking
   const handleSubmitBooking = async (formData, calculatedEnd) => {
     if (!currentUser) {
       alert("Please log in with your Microsoft account to book.");
@@ -233,35 +250,11 @@ function App() {
     });
 
     setSelectedSlot(null);
-
-    fetch('http://localhost:5000/add-booking', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: userName,
-        cpr: formData.cpr,
-        phone: formData.phone,
-        department: formData.department || currentUser.department || "",
-        room: selectedSlot.resourceId,
-        start: selectedSlot.start,
-        end: calculatedEnd,
-        userId,
-      }),
-    })
-      .then(() => console.log("✅ Sent to Google Sheets"))
-      .catch(err => console.error("❌ Failed to send to Google Sheets:", err));
   };
 
-  // Delete event
+  // Delete event (Admin only)
   const handleEventDelete = async (eventId) => {
-    const event = events.find((e) => e.id === eventId);
-    const isOwner = currentUser?.username && event?.userId === currentUser.username;
-
-    if (!isAdmin && !isOwner) {
-      alert('You can only delete your own bookings.');
-      return;
-    }
-
+    if (!isAdmin) return; 
     try {
       await deleteDoc(doc(db, 'bookings', eventId));
     } catch (err) {
@@ -284,7 +277,10 @@ function App() {
         <h2 style={{ color: "white" }}>Meeting Booking System</h2>
         {currentUser ? (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span>Welcome, <strong>{currentUser.name}</strong></span>
+            <span>
+              Welcome, <strong>{currentUser.name}</strong>
+              {isAdmin && <span className="admin-badge"> (Admin)</span>}
+            </span>
             <button
               onClick={handleLogout}
               style={{
@@ -316,7 +312,6 @@ function App() {
         )}
       </header>
 
-      {/* Rest of the app */}
       <div className="login-wrapper" style={{ margin: "10px 0" }}>
         <button onClick={() => setManualBookingOpen(true)}>Book Manually</button>
       </div>
