@@ -3,18 +3,15 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
-import BookingActionModal from './BookingActionModal';
 import './CalendarView.css';
 
-function CalendarView({ events, onSelectSlot, isAdmin, currentUser }) {
-  const [selectedEvent, setSelectedEvent] = React.useState(null);
+function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedEvent }) {
 
   const handleEventClick = (info) => {
-  if (!isAdmin) return; // Only admins can open the action modal
-  const eventData = events.find((e) => e.id === info.event.id);
-  setSelectedEvent(eventData);
-};
-
+    if (!isAdmin) return;
+    const eventData = events.find((e) => e.id === info.event.id);
+    setSelectedEvent(eventData);
+  };
 
   const renderEventContent = (arg) => {
     const { status } = arg.event.extendedProps;
@@ -81,14 +78,6 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser }) {
           </div>
         </div>
       </div>
-
-      {isAdmin && selectedEvent && (
-        <BookingActionModal
-          eventData={selectedEvent}
-          onClose={() => setSelectedEvent(null)}
-          events={events}
-        />
-      )}
     </div>
   );
 }

@@ -15,4 +15,9 @@ const msalConfig = {
   },
 };
 
+// Scopes required for user profile and sending emails
+export const loginRequest = {
+  scopes: ["User.Read", "Mail.Send"],
+};
+
 export const msalInstance = new PublicClientApplication(msalConfig);

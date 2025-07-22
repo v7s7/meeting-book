@@ -3,6 +3,9 @@ import CalendarView from './components/CalendarView';
 import BookingForm from './components/BookingForm';
 import ManualBookingForm from './components/ManualBookingForm';
 import { db } from './utils/firebase';
+import { loginRequest } from "./utils/msalConfig";
+import BookingActionModal from './components/BookingActionModal';
+
 import {
   setDoc,
   collection,
@@ -17,10 +20,10 @@ import './App.css';
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
-const ADMIN_EMAILS = ["a.alkubaesy@swd.bh", "admin2@swd.bh", "admin3@swd.bh"];
+const ADMIN_EMAILS = ["a.alkubsaesy@swd.bh", "m.adil@swd.bh", "admin3@swd.bh"];
 
 async function getUserProfile(instance, account) {
-  const request = { scopes: ["User.Read"], account: account };
+const request = { ...loginRequest, account: account };
   try {
     const response = await instance.acquireTokenSilent(request);
     const userInfo = await fetch("https://graph.microsoft.com/v1.0/me", {
@@ -55,6 +58,8 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userLastBooking, setUserLastBooking] = useState(null);
   const [manualBookingOpen, setManualBookingOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
 
   // Fetch Microsoft user profile after login
   useEffect(() => {
@@ -143,42 +148,67 @@ function App() {
 
     return () => unsub();
   }, [currentUser]);
+const [accessToken, setAccessToken] = useState(null);
 
   // Microsoft Login
-  const handleMicrosoftLogin = () => {
-    instance.loginPopup({ scopes: ["User.Read"] })
-      .then(response => {
-        instance.setActiveAccount(response.account);
-        setActiveAccount(response.account);
-        return getUserProfile(instance, response.account);
-      })
-      .then(profile => {
-        if (!profile) {
-          alert("Failed to fetch Microsoft profile. Please try again.");
-          return;
-        }
+const handleMicrosoftLogin = () => {
+  instance.loginPopup(loginRequest)
+    .then(async (response) => {
+      instance.setActiveAccount(response.account);
+      setActiveAccount(response.account);
 
-        if (!profile.userPrincipalName.endsWith("@swd.bh")) {
-          alert("Access denied. Only @swd.bh emails are allowed.");
-          handleLogout();
-          return;
-        }
+      // Get the token with Mail.Send
+      const tokenResponse = await instance.acquireTokenSilent(loginRequest);
+      setAccessToken(tokenResponse.accessToken); // Add a new state for accessToken
 
-        setCurrentUser(prev => ({
-          ...prev,
-          username: profile.userPrincipalName || "",
-          name: profile.displayName || "Unknown User",
-          department: prev?.department || profile.department || "",
-          phone: profile.mobilePhone || prev?.phone || "",
-        }));
+      return getUserProfile(instance, response.account);
+    })
+    .then(profile => {
+      if (!profile) {
+        alert("Failed to fetch Microsoft profile. Please try again.");
+        return;
+      }
 
-        setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
-      })
-      .catch(err => {
-        console.error("Login failed:", err);
-        alert("Microsoft login failed: " + err.message);
-      });
-  };
+      if (!profile.userPrincipalName.endsWith("@swd.bh")) {
+        alert("Access denied. Only @swd.bh emails are allowed.");
+        handleLogout();
+        return;
+      }
+
+      setCurrentUser(prev => ({
+        ...prev,
+        username: profile.userPrincipalName || "",
+        name: profile.displayName || "Unknown User",
+        department: prev?.department || profile.department || "",
+        phone: profile.mobilePhone || prev?.phone || "",
+      }));
+
+      setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
+    })
+    .catch(err => {
+      console.error("Login failed:", err);
+      alert("Microsoft login failed: " + err.message);
+    });
+};
+
+  const getFreshAccessToken = async () => {
+  try {
+    const tokenResponse = await instance.acquireTokenSilent(loginRequest);
+    setAccessToken(tokenResponse.accessToken);
+    return tokenResponse.accessToken;
+  } catch (err) {
+    console.error("Silent token refresh failed, trying popup:", err);
+    try {
+      const tokenResponse = await instance.acquireTokenPopup(loginRequest);
+      setAccessToken(tokenResponse.accessToken);
+      return tokenResponse.accessToken;
+    } catch (popupErr) {
+      console.error("Token acquisition failed:", popupErr);
+      return null;
+    }
+  }
+};
+
 
   const handleLogout = () => {
     instance.logoutPopup().then(() => {
@@ -295,6 +325,7 @@ function App() {
             >
               Logout
             </button>
+            
           </div>
         ) : (
           <button
@@ -327,14 +358,27 @@ function App() {
   </button>
 </div>
 
+{isAdmin && selectedEvent && (
+  <BookingActionModal
+    eventData={selectedEvent}
+    onClose={() => setSelectedEvent(null)}
+    events={events}
+    accessToken={accessToken}
+    getFreshAccessToken={getFreshAccessToken}  // <-- ADD THIS
+  />
+)}
+
+
 
       <CalendarView
-        events={events}
-        onSelectSlot={handleSlotSelect}
-        onDeleteEvent={handleEventDelete}
-        isAdmin={isAdmin}
-        currentUser={currentUser}
-      />
+  events={events}
+  onSelectSlot={handleSlotSelect}
+  onDeleteEvent={handleEventDelete}
+  isAdmin={isAdmin}
+  currentUser={currentUser}
+  setSelectedEvent={setSelectedEvent}
+/>
+
 
      {currentUser && (
   <BookingForm
@@ -353,6 +397,7 @@ function App() {
           }
     }
   />
+  
 )}
 
 
