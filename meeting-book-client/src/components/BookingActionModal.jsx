@@ -36,62 +36,71 @@ const response = await fetch("/send-email", {
   }
 };
 
+const approveBooking = async () => {
+  try {
+    const floorCollection =
+      eventData.floor === 10 ? "bookings_floor10" : "bookings_floor7";
 
-  const approveBooking = async () => {
-    try {
-      await updateDoc(doc(db, "bookings", eventData.id), { status: "approved" });
+    await updateDoc(doc(db, floorCollection, eventData.id), { status: "approved" });
 
-      // Send approval email
-      if (eventData.userEmail) {
-        await sendEmail(
-          eventData.userEmail,
-          "Your Booking is Approved",
-          `Hello ${eventData.name},\n\nYour booking for ${eventData.room} from ${new Date(
-            eventData.start
-          ).toLocaleString()} to ${new Date(eventData.end).toLocaleTimeString()} has been approved.\n\nThank you.`
-        );
-      }
-
-      // Remove overlapping pending bookings
-      const overlappingPending = events.filter(
-        (e) =>
-          e.id !== eventData.id &&
-          e.status === "pending" &&
-          e.room === eventData.room &&
-          new Date(e.start) < new Date(eventData.end) &&
-          new Date(e.end) > new Date(eventData.start)
+    // Send approval email
+    if (eventData.userEmail) {
+      await sendEmail(
+        eventData.userEmail,
+        "Your Booking is Approved",
+        `Hello ${eventData.name},\n\nYour booking for ${eventData.room} from ${new Date(
+          eventData.start
+        ).toLocaleString()} to ${new Date(
+          eventData.end
+        ).toLocaleTimeString()} has been approved.\n\nThank you.`
       );
-
-      for (const booking of overlappingPending) {
-        await deleteDoc(doc(db, "bookings", booking.id));
-      }
-    } catch (error) {
-      console.error("Error approving booking:", error);
-    } finally {
-      onClose();
     }
-  };
 
-  const removeBooking = async () => {
-    try {
-      await deleteDoc(doc(db, "bookings", eventData.id));
+    // Remove overlapping pending bookings in the same floor
+    const overlappingPending = events.filter(
+      (e) =>
+        e.id !== eventData.id &&
+        e.status === "pending" &&
+        e.room === eventData.room &&
+        e.floor === eventData.floor &&
+        new Date(e.start) < new Date(eventData.end) &&
+        new Date(e.end) > new Date(eventData.start)
+    );
 
-      // Send decline email
-      if (eventData.userEmail) {
-        await sendEmail(
-          eventData.userEmail,
-          "Your Booking Request",
-          `Hello ${eventData.name},\n\nUnfortunately, your booking for ${eventData.room} on ${new Date(
-            eventData.start
-          ).toLocaleString()} was declined. Please choose another available time slot.\n\nThank you.`
-        );
-      }
-    } catch (error) {
-      console.error("Error removing booking:", error);
-    } finally {
-      onClose();
+    for (const booking of overlappingPending) {
+      await deleteDoc(doc(db, floorCollection, booking.id));
     }
-  };
+  } catch (error) {
+    console.error("Error approving booking:", error);
+  } finally {
+    onClose();
+  }
+};
+
+const removeBooking = async () => {
+  try {
+    const floorCollection =
+      eventData.floor === 10 ? "bookings_floor10" : "bookings_floor7";
+
+    await deleteDoc(doc(db, floorCollection, eventData.id));
+
+    // Send decline email
+    if (eventData.userEmail) {
+      await sendEmail(
+        eventData.userEmail,
+        "Your Booking Request",
+        `Hello ${eventData.name},\n\nUnfortunately, your booking for ${eventData.room} on ${new Date(
+          eventData.start
+        ).toLocaleString()} was declined.\n\nThank you.`
+      );
+    }
+  } catch (error) {
+    console.error("Error removing booking:", error);
+  } finally {
+    onClose();
+  }
+};
+
 
   return (
     <div className="modal-overlay">

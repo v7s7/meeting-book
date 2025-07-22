@@ -5,7 +5,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 import './CalendarView.css';
 
-function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedEvent }) {
+function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedEvent, selectedFloor }) {
 
   const handleEventClick = (info) => {
     if (!isAdmin) return;
@@ -56,14 +56,22 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedE
                 center: 'title',
                 right: ''
               }}
-              resources={[
-                { id: 'Room 1', title: 'Room 1' },
-                { id: 'Room 2', title: 'Room 2' },
-                { id: 'Room 3', title: 'Room 3' }
-              ]}
+              resources={
+                selectedFloor === 10
+                  ? [
+                      { id: 'Room 1', title: 'Room 1 (  Big Room )' },
+                      { id: 'Room 2', title: 'Room 2 (  Mid Room )' },
+                      { id: 'Room 3', title: 'Room 3 (  Small Room NO TV)'}
+                    ]
+                  : [
+                      { id: 'Room 1', title: 'Meeting Room' },
+                      { id: 'Room 2', title: 'Training Room' }
+                    ]
+              }
               events={events.map(event => ({
                 ...event,
                 resourceId: event.room || 'Room 1',
+                floor: selectedFloor, // ensure floor info
               }))}
               eventContent={renderEventContent}
               select={(info) => {

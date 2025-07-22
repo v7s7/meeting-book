@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './BookingForm.css'; // Reuse existing styles
 
-function ManualBookingForm({ onClose, onSubmit }) {
+function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
   const [room, setRoom] = useState('Room 1');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -38,10 +38,20 @@ function ManualBookingForm({ onClose, onSubmit }) {
 
           <label>Room:</label>
           <select value={room} onChange={(e) => setRoom(e.target.value)}>
-            <option value="Room 1">Room 1</option>
-            <option value="Room 2">Room 2</option>
-            <option value="Room 3">Room 3</option>
-          </select>
+  {selectedFloor === 10 ? (
+    <>
+      <option value="Room 1">Room 1</option>
+      <option value="Room 2">Room 2</option>
+      <option value="Room 3">Room 3</option>
+    </>
+  ) : (
+    <>
+      <option value="Room 1">Room 1</option>
+      <option value="Room 2">Room 2</option>
+    </>
+  )}
+</select>
+
 
           <label>Duration (minutes):</label>
           <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>

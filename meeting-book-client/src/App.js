@@ -5,6 +5,7 @@ import ManualBookingForm from './components/ManualBookingForm';
 import { db } from './utils/firebase';
 import { loginRequest } from "./utils/msalConfig";
 import BookingActionModal from './components/BookingActionModal';
+import FloorSelector from "./components/FloorSelector";
 
 import {
   setDoc,
@@ -20,7 +21,7 @@ import './App.css';
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
-const ADMIN_EMAILS = ["a.alkubsaesy@swd.bh", "m.adil@swd.bh", "admin3@swd.bh"];
+const ADMIN_EMAILS = ["a.alkubaesy@swd.bh", "m.adil@swd.bh", "admin3@swd.bh"];
 
 async function getUserProfile(instance, account) {
 const request = { ...loginRequest, account: account };
@@ -59,6 +60,7 @@ function App() {
   const [userLastBooking, setUserLastBooking] = useState(null);
   const [manualBookingOpen, setManualBookingOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+const [selectedFloor, setSelectedFloor] = useState(10); // default floor 10
 
 
   // Fetch Microsoft user profile after login
@@ -119,35 +121,28 @@ function App() {
 
   // Firestore: Load bookings
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+  if (!selectedFloor) return;
+  const collectionName = selectedFloor === 10 ? "bookings_floor10" : "bookings_floor7";
+  
+  const unsub = onSnapshot(collection(db, collectionName), (snapshot) => {
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-      setEvents(
-        data.map((event) => ({
-          ...event,
-          title: event.department
-            ? `${event.name} – ${event.department}`
-            : event.name,
-        }))
-      );
+    setEvents(
+      data.map((event) => ({
+        ...event,
+        title: event.department
+          ? `${event.name} – ${event.department}`
+          : event.name,
+      }))
+    );
+  });
 
-      if (currentUser) {
-        const userBookings = data
-          .filter((b) => b.userId === currentUser.username)
-          .sort((a, b) => new Date(b.start) - new Date(a.start));
+  return () => unsub();
+}, [selectedFloor]);
 
-        if (userBookings.length > 0) {
-          const { name, cpr, phone, department } = userBookings[0];
-          setUserLastBooking({ name, cpr, phone, department });
-        }
-      }
-    });
-
-    return () => unsub();
-  }, [currentUser]);
 const [accessToken, setAccessToken] = useState(null);
 
   // Microsoft Login
@@ -238,62 +233,69 @@ const handleMicrosoftLogin = () => {
 
 
   // Submit booking
-  const handleSubmitBooking = async (formData, calculatedEnd) => {
-    if (!currentUser) {
-      alert("Please log in with your Microsoft account to book.");
-      return;
-    }
+ const handleSubmitBooking = async (formData, calculatedEnd) => {
+  if (!currentUser) {
+    alert("Please log in with your Microsoft account to book.");
+    return;
+  }
 
-    const userId = currentUser.username;
-    const userName = currentUser.name;
+  const userId = currentUser.username;
+  const userName = currentUser.name;
 
-    await addDoc(collection(db, 'bookings'), {
-      name: userName,
-      cpr: formData.cpr,
-      phone: formData.phone,
-      department: formData.department || currentUser.department || "",
-      room: selectedSlot.resourceId,
-      start: selectedSlot.start,
-      end: calculatedEnd,
-      userId,
-      userEmail: userId,
-      bookedBy: userName,
-      status: "pending"
-    });
+  // Choose the correct collection based on selectedFloor
+  const collectionName = selectedFloor === 10 ? 'bookings_floor10' : 'bookings_floor7';
 
-    await setDoc(doc(db, 'users', userId), {
-      name: userName,
-      cpr: formData.cpr,
-      phone: formData.phone,
-      department: formData.department || currentUser.department || ""
-    });
+  await addDoc(collection(db, collectionName), {
+    name: userName,
+    cpr: formData.cpr,
+    phone: formData.phone,
+    department: formData.department || currentUser.department || "",
+    room: selectedSlot.resourceId,
+    start: selectedSlot.start,
+    end: calculatedEnd,
+    userId,
+    userEmail: userId,
+    bookedBy: userName,
+    floor: selectedFloor, // store floor info
+    status: "pending"
+  });
 
-    setUserLastBooking({
-      name: userName,
-      cpr: formData.cpr,
-      phone: formData.phone,
-      department: formData.department || currentUser.department || ""
-    });
+  await setDoc(doc(db, 'users', userId), {
+    name: userName,
+    cpr: formData.cpr,
+    phone: formData.phone,
+    department: formData.department || currentUser.department || ""
+  });
 
-    // Update local currentUser with latest department
-    setCurrentUser(prev => ({
-      ...prev,
-      department: formData.department || currentUser.department || ""
-    }));
+  setUserLastBooking({
+    name: userName,
+    cpr: formData.cpr,
+    phone: formData.phone,
+    department: formData.department || currentUser.department || ""
+  });
 
-    setSelectedSlot(null);
-  };
+  // Update local currentUser with latest department
+  setCurrentUser(prev => ({
+    ...prev,
+    department: formData.department || currentUser.department || ""
+  }));
+
+  setSelectedSlot(null);
+};
+
 
   // Delete event (Admin only)
-  const handleEventDelete = async (eventId) => {
-    if (!isAdmin) return;
-    try {
-      await deleteDoc(doc(db, 'bookings', eventId));
-    } catch (err) {
-      console.error('Error deleting:', err);
-      alert('Failed to delete booking.');
-    }
-  };
+  const handleEventDelete = async (eventId, floor) => {
+  if (!isAdmin) return;
+  try {
+    const collectionName = floor === 10 ? 'bookings_floor10' : 'bookings_floor7';
+    await deleteDoc(doc(db, collectionName, eventId));
+  } catch (err) {
+    console.error('Error deleting:', err);
+    alert('Failed to delete booking.');
+  }
+};
+
 
   return (
     <div>
@@ -359,54 +361,56 @@ const handleMicrosoftLogin = () => {
 </div>
 
 {isAdmin && selectedEvent && (
-  <BookingActionModal
-    eventData={selectedEvent}
-    onClose={() => setSelectedEvent(null)}
-    events={events}
-    accessToken={accessToken}
-    getFreshAccessToken={getFreshAccessToken}  // <-- ADD THIS
-  />
-)}
-
-
-
-      <CalendarView
+ <BookingActionModal
+  eventData={selectedEvent}
+  onClose={() => setSelectedEvent(null)}
   events={events}
-  onSelectSlot={handleSlotSelect}
-  onDeleteEvent={handleEventDelete}
-  isAdmin={isAdmin}
-  currentUser={currentUser}
-  setSelectedEvent={setSelectedEvent}
+  accessToken={accessToken}
+  getFreshAccessToken={getFreshAccessToken}
 />
 
-
-     {currentUser && (
-  <BookingForm
-    slot={selectedSlot}
-    events={events}
-    onClose={() => setSelectedSlot(null)}
-    onSubmit={handleSubmitBooking}
-    lastUsedData={
-      userLastBooking
-        ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name }
-        : {
-            name: currentUser?.name || "",
-            phone: currentUser?.phone || "",
-            department: currentUser?.department || "",
-            cpr: ""
-          }
-    }
-  />
-  
 )}
 
+{!selectedFloor ? (
+  <div style={{ textAlign: "center", margin: "20px" }}>
+    <h3>Select Floor</h3>
+    <button onClick={() => setSelectedFloor(10)}>10th Floor</button>
+    <button onClick={() => setSelectedFloor(7)}>7th Floor</button>
+  </div>
+) : (
+  <>
+  <FloorSelector selectedFloor={selectedFloor} onChange={setSelectedFloor} />
 
-      {manualBookingOpen && (
-        <ManualBookingForm
-          onClose={() => setManualBookingOpen(false)}
-          onSubmit={(slot) => setSelectedSlot(slot)}
-        />
-      )}
+    <CalendarView
+      events={events}
+      onSelectSlot={handleSlotSelect}
+      onDeleteEvent={handleEventDelete}
+      isAdmin={isAdmin}
+      currentUser={currentUser}
+      setSelectedEvent={setSelectedEvent}
+      selectedFloor={selectedFloor} // Pass floor
+    />
+
+    {currentUser && (
+      <BookingForm
+        slot={selectedSlot}
+        events={events}
+        onClose={() => setSelectedSlot(null)}
+        onSubmit={handleSubmitBooking}
+        lastUsedData={userLastBooking ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name } : { name: currentUser?.name || "", phone: currentUser?.phone || "", department: currentUser?.department || "", cpr: "" }}
+      />
+    )}
+
+    {manualBookingOpen && (
+      <ManualBookingForm
+        onClose={() => setManualBookingOpen(false)}
+        onSubmit={(slot) => setSelectedSlot(slot)}
+        selectedFloor={selectedFloor} // Pass floor
+      />
+    )}
+  </>
+)}
+
     </div>
   );
 }
