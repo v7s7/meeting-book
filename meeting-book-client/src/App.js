@@ -188,19 +188,24 @@ function App() {
   };
 
   const handleSlotSelect = (info) => {
-    const start = new Date(info.start);
-    let end = new Date(info.end);
+  if (!currentUser) {
+    alert("You must log in to book a meeting room.");
+    return;
+  }
 
-    if (start.getTime() === end.getTime()) {
-      end = new Date(start.getTime() + 30 * 60 * 1000);
-    }
+  const start = new Date(info.start);
+  let end = new Date(info.end);
+  if (start.getTime() === end.getTime()) {
+    end = new Date(start.getTime() + 30 * 60 * 1000);
+  }
 
-    setSelectedSlot({
-      start: start.toISOString(),
-      end: end.toISOString(),
-      resourceId: info.resource?.id || info.resourceId || 'Room 1',
-    });
-  };
+  setSelectedSlot({
+    start: start.toISOString(),
+    end: end.toISOString(),
+    resourceId: info.resource?.id || info.resourceId || 'Room 1',
+  });
+};
+
 
   // Submit booking
   const handleSubmitBooking = async (formData, calculatedEnd) => {
@@ -309,8 +314,19 @@ function App() {
       </header>
 
       <div className="login-wrapper" style={{ margin: "10px 0" }}>
-        <button onClick={() => setManualBookingOpen(true)}>Book Manually</button>
-      </div>
+  <button
+    onClick={() => {
+      if (!currentUser) {
+        alert("Please log in first.");
+        return;
+      }
+      setManualBookingOpen(true);
+    }}
+  >
+    Book Manually
+  </button>
+</div>
+
 
       <CalendarView
         events={events}
@@ -320,22 +336,25 @@ function App() {
         currentUser={currentUser}
       />
 
-      <BookingForm
-        slot={selectedSlot}
-        events={events}
-        onClose={() => setSelectedSlot(null)}
-        onSubmit={handleSubmitBooking}
-        lastUsedData={
-          userLastBooking
-            ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name }
-            : {
-                name: currentUser?.name || "",
-                phone: currentUser?.phone || "",
-                department: currentUser?.department || "",
-                cpr: ""
-              }
-        }
-      />
+     {currentUser && (
+  <BookingForm
+    slot={selectedSlot}
+    events={events}
+    onClose={() => setSelectedSlot(null)}
+    onSubmit={handleSubmitBooking}
+    lastUsedData={
+      userLastBooking
+        ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name }
+        : {
+            name: currentUser?.name || "",
+            phone: currentUser?.phone || "",
+            department: currentUser?.department || "",
+            cpr: ""
+          }
+    }
+  />
+)}
+
 
       {manualBookingOpen && (
         <ManualBookingForm
