@@ -14,17 +14,49 @@ import {
   onSnapshot,
   deleteDoc,
   doc,
-  getDocs,
   getDoc
 } from 'firebase/firestore';
 import './App.css';
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
-const ADMIN_EMAILS = ["a.alkubaesy@swd.bh", "m.adil@swd.bh", "admin3@swd.bh"];
+const ADMIN_NOTIFICATION_CONFIG = [
+  // { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
+  { email: "m.adil@swd.bh", floors: [7,10] },
+];
 
+// Helper to check if the current profile is an admin
+function isAdminUser(email) {
+  return ADMIN_NOTIFICATION_CONFIG.some(admin => admin.email === email);
+}
+
+// Helper to send an email
+async function sendEmail(to, subject, message, token) {
+  const backendUrl = process.env.REACT_APP_API_URL || "http://localhost:5000"; 
+  try {
+    const response = await fetch(`${backendUrl}/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, message, accessToken: token }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Email failed to ${to}:`, errorText);
+      return false;
+    }
+    console.log(`✅ Email successfully sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Email send error to ${to}:`, error);
+    return false;
+  }
+}
+
+
+// Fetch user profile with MSAL
 async function getUserProfile(instance, account) {
-const request = { ...loginRequest, account: account };
+  const request = { ...loginRequest, account };
   try {
     const response = await instance.acquireTokenSilent(request);
     const userInfo = await fetch("https://graph.microsoft.com/v1.0/me", {
@@ -32,7 +64,7 @@ const request = { ...loginRequest, account: account };
     });
     return userInfo.json();
   } catch (error) {
-    console.error("Silent token acquisition failed:", error);
+    console.warn("Silent token acquisition failed:", error);
     if (error instanceof InteractionRequiredAuthError) {
       try {
         const response = await instance.acquireTokenPopup(request);
@@ -44,9 +76,8 @@ const request = { ...loginRequest, account: account };
         console.error("Popup token acquisition failed:", popupError);
         return null;
       }
-    } else {
-      return null;
     }
+    return null;
   }
 }
 
@@ -60,20 +91,16 @@ function App() {
   const [userLastBooking, setUserLastBooking] = useState(null);
   const [manualBookingOpen, setManualBookingOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-const [selectedFloor, setSelectedFloor] = useState(10); // default floor 10
-
+  const [selectedFloor, setSelectedFloor] = useState(10);
+  const [accessToken, setAccessToken] = useState(null);
 
   // Fetch Microsoft user profile after login
   useEffect(() => {
     if (activeAccount) {
       getUserProfile(instance, activeAccount)
         .then(profile => {
-          if (!profile || !profile.userPrincipalName) {
-            console.error("Failed to retrieve profile or userPrincipalName missing.");
-            return;
-          }
+          if (!profile || !profile.userPrincipalName) return console.error("Invalid profile data");
 
-          // Allow only @swd.bh emails
           if (!profile.userPrincipalName.endsWith("@swd.bh")) {
             alert("Access denied. Only @swd.bh emails are allowed.");
             handleLogout();
@@ -84,12 +111,11 @@ const [selectedFloor, setSelectedFloor] = useState(10); // default floor 10
             ...prev,
             username: profile.userPrincipalName || "",
             name: profile.displayName || "Unknown User",
-            // Keep previous department if Microsoft profile doesn't provide it
             department: prev?.department || profile.department || "",
             phone: profile.mobilePhone || prev?.phone || "",
           }));
 
-          setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
+          setIsAdmin(isAdminUser(profile.userPrincipalName));
         })
         .catch(err => console.error("Profile fetch failed:", err));
     }
@@ -105,12 +131,7 @@ const [selectedFloor, setSelectedFloor] = useState(10); // default floor 10
         if (userSnap.exists()) {
           const data = userSnap.data();
           setUserLastBooking(data);
-
-          // Always prioritize Firestore department
-          setCurrentUser(prev => ({
-            ...prev,
-            department: data.department || prev?.department || ""
-          }));
+          setCurrentUser(prev => ({ ...prev, department: data.department || prev?.department || "" }));
         }
       } catch (err) {
         console.error("Failed to fetch user data:", err);
@@ -121,89 +142,72 @@ const [selectedFloor, setSelectedFloor] = useState(10); // default floor 10
 
   // Firestore: Load bookings
   useEffect(() => {
-  if (!selectedFloor) return;
-  const collectionName = selectedFloor === 10 ? "bookings_floor10" : "bookings_floor7";
-  
-  const unsub = onSnapshot(collection(db, collectionName), (snapshot) => {
-    const data = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    setEvents(
-      data.map((event) => ({
-        ...event,
-        title: event.department
-          ? `${event.name} – ${event.department}`
-          : event.name,
-      }))
-    );
-  });
-
-  return () => unsub();
-}, [selectedFloor]);
-
-const [accessToken, setAccessToken] = useState(null);
+    if (!selectedFloor) return;
+    const collectionName = selectedFloor === 10 ? "bookings_floor10" : "bookings_floor7";
+    const unsub = onSnapshot(collection(db, collectionName), snapshot => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setEvents(
+        data.map(event => ({
+          ...event,
+          title: event.department ? `${event.name} – ${event.department}` : event.name,
+        }))
+      );
+    });
+    return () => unsub();
+  }, [selectedFloor]);
 
   // Microsoft Login
-const handleMicrosoftLogin = () => {
-  instance.loginPopup(loginRequest)
-    .then(async (response) => {
-      instance.setActiveAccount(response.account);
-      setActiveAccount(response.account);
+  const handleMicrosoftLogin = () => {
+    instance.loginPopup(loginRequest)
+      .then(async response => {
+        instance.setActiveAccount(response.account);
+        setActiveAccount(response.account);
+        const tokenResponse = await instance.acquireTokenSilent(loginRequest);
+        setAccessToken(tokenResponse.accessToken);
+        return getUserProfile(instance, response.account);
+      })
+      .then(profile => {
+        if (!profile) return alert("Failed to fetch Microsoft profile.");
 
-      // Get the token with Mail.Send
-      const tokenResponse = await instance.acquireTokenSilent(loginRequest);
-      setAccessToken(tokenResponse.accessToken); // Add a new state for accessToken
+        if (!profile.userPrincipalName.endsWith("@swd.bh")) {
+          alert("Access denied. Only @swd.bh emails are allowed.");
+          handleLogout();
+          return;
+        }
 
-      return getUserProfile(instance, response.account);
-    })
-    .then(profile => {
-      if (!profile) {
-        alert("Failed to fetch Microsoft profile. Please try again.");
-        return;
-      }
+        setCurrentUser(prev => ({
+          ...prev,
+          username: profile.userPrincipalName || "",
+          name: profile.displayName || "Unknown User",
+          department: prev?.department || profile.department || "",
+          phone: profile.mobilePhone || prev?.phone || "",
+        }));
 
-      if (!profile.userPrincipalName.endsWith("@swd.bh")) {
-        alert("Access denied. Only @swd.bh emails are allowed.");
-        handleLogout();
-        return;
-      }
-
-      setCurrentUser(prev => ({
-        ...prev,
-        username: profile.userPrincipalName || "",
-        name: profile.displayName || "Unknown User",
-        department: prev?.department || profile.department || "",
-        phone: profile.mobilePhone || prev?.phone || "",
-      }));
-
-      setIsAdmin(ADMIN_EMAILS.includes(profile.userPrincipalName));
-    })
-    .catch(err => {
-      console.error("Login failed:", err);
-      alert("Microsoft login failed: " + err.message);
-    });
-};
+        setIsAdmin(isAdminUser(profile.userPrincipalName));
+      })
+      .catch(err => {
+        console.error("Login failed:", err);
+        alert("Microsoft login failed: " + err.message);
+      });
+  };
 
   const getFreshAccessToken = async () => {
-  try {
-    const tokenResponse = await instance.acquireTokenSilent(loginRequest);
-    setAccessToken(tokenResponse.accessToken);
-    return tokenResponse.accessToken;
-  } catch (err) {
-    console.error("Silent token refresh failed, trying popup:", err);
     try {
-      const tokenResponse = await instance.acquireTokenPopup(loginRequest);
+      const tokenResponse = await instance.acquireTokenSilent(loginRequest);
       setAccessToken(tokenResponse.accessToken);
       return tokenResponse.accessToken;
-    } catch (popupErr) {
-      console.error("Token acquisition failed:", popupErr);
-      return null;
+    } catch (err) {
+      console.error("Silent token refresh failed:", err);
+      try {
+        const tokenResponse = await instance.acquireTokenPopup(loginRequest);
+        setAccessToken(tokenResponse.accessToken);
+        return tokenResponse.accessToken;
+      } catch (popupErr) {
+        console.error("Token acquisition failed:", popupErr);
+        return null;
+      }
     }
-  }
-};
-
+  };
 
   const handleLogout = () => {
     instance.logoutPopup().then(() => {
@@ -212,90 +216,108 @@ const handleMicrosoftLogin = () => {
     });
   };
 
-  const handleSlotSelect = (info) => {
-  if (!currentUser) {
-    alert("You must log in to book a meeting room.");
+  const handleSlotSelect = info => {
+    if (!currentUser) return alert("You must log in to book a meeting room.");
+    const start = new Date(info.start);
+    let end = new Date(info.end);
+    if (start.getTime() === end.getTime()) end = new Date(start.getTime() + 30 * 60 * 1000);
+    setSelectedSlot({ start: start.toISOString(), end: end.toISOString(), resourceId: info.resource?.id || 'Room 1' });
+  };
+
+  // Notify admins about a pending booking
+const notifyAdminsPendingBooking = async (userName, formData, slot, calculatedEnd, floor) => {
+  const floorName = floor === 10 ? "10th Floor" : "7th Floor";
+  const bookingDetails = `
+    New booking request (Pending)
+    ---------------------------
+    Name: ${userName}
+    Department: ${formData.department || "N/A"}
+    Phone: ${formData.phone}
+    CPR: ${formData.cpr}
+    Room: ${slot.resourceId}
+    Start: ${new Date(slot.start).toLocaleString()}
+    End: ${new Date(calculatedEnd).toLocaleString()}
+    Floor: ${floorName}
+  `;
+
+  const adminsToNotify = ADMIN_NOTIFICATION_CONFIG
+    .filter(admin => admin.floors.includes(floor))
+    .map(admin => admin.email);
+
+  console.log("Admins to notify:", adminsToNotify);
+
+  const token = accessToken || (await getFreshAccessToken());
+  if (!token) {
+    console.error("❌ No access token available for admin notifications.");
     return;
   }
 
-  const start = new Date(info.start);
-  let end = new Date(info.end);
-  if (start.getTime() === end.getTime()) {
-    end = new Date(start.getTime() + 30 * 60 * 1000);
+  for (const adminEmail of adminsToNotify) {
+    const success = await sendEmail(adminEmail, `New Booking Request - ${floorName}`, bookingDetails, token);
+    if (!success) {
+      console.warn(`⚠ Failed to notify admin: ${adminEmail}`);
+    }
   }
-
-  setSelectedSlot({
-    start: start.toISOString(),
-    end: end.toISOString(),
-    resourceId: info.resource?.id || info.resourceId || 'Room 1',
-  });
 };
+
 
 
   // Submit booking
- const handleSubmitBooking = async (formData, calculatedEnd) => {
-  if (!currentUser) {
-    alert("Please log in with your Microsoft account to book.");
-    return;
-  }
+  const handleSubmitBooking = async (formData, calculatedEnd) => {
+    if (!currentUser) return alert("Please log in with your Microsoft account to book.");
+    const userId = currentUser.username;
+    const userName = currentUser.name;
+    const collectionName = selectedFloor === 10 ? 'bookings_floor10' : 'bookings_floor7';
 
-  const userId = currentUser.username;
-  const userName = currentUser.name;
+    await addDoc(collection(db, collectionName), {
+      name: userName,
+      cpr: formData.cpr,
+      phone: formData.phone,
+      department: formData.department || currentUser.department || "",
+      room: selectedSlot.resourceId,
+      start: selectedSlot.start,
+      end: calculatedEnd,
+      userId,
+      userEmail: userId,
+      bookedBy: userName,
+      floor: selectedFloor,
+      status: "pending"
+    });
 
-  // Choose the correct collection based on selectedFloor
-  const collectionName = selectedFloor === 10 ? 'bookings_floor10' : 'bookings_floor7';
+    await setDoc(doc(db, 'users', userId), {
+      name: userName,
+      cpr: formData.cpr,
+      phone: formData.phone,
+      department: formData.department || currentUser.department || ""
+    });
 
-  await addDoc(collection(db, collectionName), {
-    name: userName,
-    cpr: formData.cpr,
-    phone: formData.phone,
-    department: formData.department || currentUser.department || "",
-    room: selectedSlot.resourceId,
-    start: selectedSlot.start,
-    end: calculatedEnd,
-    userId,
-    userEmail: userId,
-    bookedBy: userName,
-    floor: selectedFloor, // store floor info
-    status: "pending"
-  });
+    setUserLastBooking({
+      name: userName,
+      cpr: formData.cpr,
+      phone: formData.phone,
+      department: formData.department || currentUser.department || ""
+    });
 
-  await setDoc(doc(db, 'users', userId), {
-    name: userName,
-    cpr: formData.cpr,
-    phone: formData.phone,
-    department: formData.department || currentUser.department || ""
-  });
+    setCurrentUser(prev => ({
+      ...prev,
+      department: formData.department || currentUser.department || ""
+    }));
 
-  setUserLastBooking({
-    name: userName,
-    cpr: formData.cpr,
-    phone: formData.phone,
-    department: formData.department || currentUser.department || ""
-  });
-
-  // Update local currentUser with latest department
-  setCurrentUser(prev => ({
-    ...prev,
-    department: formData.department || currentUser.department || ""
-  }));
-
-  setSelectedSlot(null);
-};
-
+    await notifyAdminsPendingBooking(userName, formData, selectedSlot, calculatedEnd, selectedFloor);
+    setSelectedSlot(null);
+  };
 
   // Delete event (Admin only)
   const handleEventDelete = async (eventId, floor) => {
-  if (!isAdmin) return;
-  try {
-    const collectionName = floor === 10 ? 'bookings_floor10' : 'bookings_floor7';
-    await deleteDoc(doc(db, collectionName, eventId));
-  } catch (err) {
-    console.error('Error deleting:', err);
-    alert('Failed to delete booking.');
-  }
-};
-
+    if (!isAdmin) return;
+    try {
+      const collectionName = floor === 10 ? 'bookings_floor10' : 'bookings_floor7';
+      await deleteDoc(doc(db, collectionName, eventId));
+    } catch (err) {
+      console.error('Error deleting:', err);
+      alert('Failed to delete booking.');
+    }
+  };
 
   return (
     <div>
@@ -327,7 +349,6 @@ const handleMicrosoftLogin = () => {
             >
               Logout
             </button>
-            
           </div>
         ) : (
           <button
@@ -347,70 +368,69 @@ const handleMicrosoftLogin = () => {
       </header>
 
       <div className="login-wrapper" style={{ margin: "10px 0" }}>
-  <button
-    onClick={() => {
-      if (!currentUser) {
-        alert("Please log in first.");
-        return;
-      }
-      setManualBookingOpen(true);
-    }}
-  >
-    Book Manually
-  </button>
-</div>
+        <button
+          onClick={() => {
+            if (!currentUser) {
+              alert("Please log in first.");
+              return;
+            }
+            setManualBookingOpen(true);
+          }}
+        >
+          Book Manually
+        </button>
+      </div>
 
-{isAdmin && selectedEvent && (
- <BookingActionModal
-  eventData={selectedEvent}
-  onClose={() => setSelectedEvent(null)}
-  events={events}
-  accessToken={accessToken}
-  getFreshAccessToken={getFreshAccessToken}
-/>
+      {isAdmin && selectedEvent && (
+        <BookingActionModal
+          eventData={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          events={events}
+          accessToken={accessToken}
+          getFreshAccessToken={getFreshAccessToken}
+          adminEmail={currentUser?.username}
+        />
+      )}
 
-)}
+      {!selectedFloor ? (
+        <div style={{ textAlign: "center", margin: "20px" }}>
+          <h3>Select Floor</h3>
+          <button onClick={() => setSelectedFloor(10)}>10th Floor</button>
+          <button onClick={() => setSelectedFloor(7)}>7th Floor</button>
+        </div>
+      ) : (
+        <>
+          <FloorSelector selectedFloor={selectedFloor} onChange={setSelectedFloor} />
 
-{!selectedFloor ? (
-  <div style={{ textAlign: "center", margin: "20px" }}>
-    <h3>Select Floor</h3>
-    <button onClick={() => setSelectedFloor(10)}>10th Floor</button>
-    <button onClick={() => setSelectedFloor(7)}>7th Floor</button>
-  </div>
-) : (
-  <>
-  <FloorSelector selectedFloor={selectedFloor} onChange={setSelectedFloor} />
+          <CalendarView
+            events={events}
+            onSelectSlot={handleSlotSelect}
+            onDeleteEvent={handleEventDelete}
+            isAdmin={isAdmin}
+            currentUser={currentUser}
+            setSelectedEvent={setSelectedEvent}
+            selectedFloor={selectedFloor}
+          />
 
-    <CalendarView
-      events={events}
-      onSelectSlot={handleSlotSelect}
-      onDeleteEvent={handleEventDelete}
-      isAdmin={isAdmin}
-      currentUser={currentUser}
-      setSelectedEvent={setSelectedEvent}
-      selectedFloor={selectedFloor} // Pass floor
-    />
+          {currentUser && (
+            <BookingForm
+              slot={selectedSlot}
+              events={events}
+              onClose={() => setSelectedSlot(null)}
+              onSubmit={handleSubmitBooking}
+              lastUsedData={userLastBooking ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name } : { name: currentUser?.name || "", phone: currentUser?.phone || "", department: currentUser?.department || "", cpr: "" }}
+            />
+          )}
 
-    {currentUser && (
-      <BookingForm
-        slot={selectedSlot}
-        events={events}
-        onClose={() => setSelectedSlot(null)}
-        onSubmit={handleSubmitBooking}
-        lastUsedData={userLastBooking ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name } : { name: currentUser?.name || "", phone: currentUser?.phone || "", department: currentUser?.department || "", cpr: "" }}
-      />
-    )}
-
-    {manualBookingOpen && (
-      <ManualBookingForm
-        onClose={() => setManualBookingOpen(false)}
-        onSubmit={(slot) => setSelectedSlot(slot)}
-        selectedFloor={selectedFloor} // Pass floor
-      />
-    )}
-  </>
-)}
-
+          {manualBookingOpen && (
+            <ManualBookingForm
+              onClose={() => setManualBookingOpen(false)}
+              onSubmit={(slot) => setSelectedSlot(slot)}
+              selectedFloor={selectedFloor}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
