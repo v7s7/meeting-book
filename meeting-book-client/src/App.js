@@ -19,40 +19,17 @@ import {
 import './App.css';
 import { useMsal } from "@azure/msal-react";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
+import { sendPendingEmail } from "./utils/email";  // Use NodeMailer for pending emails
 
 const ADMIN_NOTIFICATION_CONFIG = [
-  // { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
-  { email: "m.adil@swd.bh", floors: [7,10] },
+  { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
+  { email: "m.adil@swd.bh", floors: [7, 10] },
 ];
 
 // Helper to check if the current profile is an admin
 function isAdminUser(email) {
   return ADMIN_NOTIFICATION_CONFIG.some(admin => admin.email === email);
 }
-
-// Helper to send an email
-async function sendEmail(to, subject, message, token) {
-  const backendUrl = process.env.REACT_APP_API_URL || "http://localhost:5000"; 
-  try {
-    const response = await fetch(`${backendUrl}/send-email`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to, subject, message, accessToken: token }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Email failed to ${to}:`, errorText);
-      return false;
-    }
-    console.log(`✅ Email successfully sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error(`❌ Email send error to ${to}:`, error);
-    return false;
-  }
-}
-
 
 // Fetch user profile with MSAL
 async function getUserProfile(instance, account) {
@@ -225,42 +202,35 @@ function App() {
   };
 
   // Notify admins about a pending booking
-const notifyAdminsPendingBooking = async (userName, formData, slot, calculatedEnd, floor) => {
-  const floorName = floor === 10 ? "10th Floor" : "7th Floor";
-  const bookingDetails = `
+  const notifyAdminsPendingBooking = async (userName, formData, slot, calculatedEnd, floor) => {
+    const floorName = floor === 10 ? "10th Floor" : "7th Floor";
+    const bookingDetails = `
     New booking request (Pending)
     ---------------------------
     Name: ${userName}
-    Department: ${formData.department || "N/A"}
+    Email: ${currentUser?.username || "N/A"}
     Phone: ${formData.phone}
     CPR: ${formData.cpr}
+    Department: ${formData.department || "N/A"}
     Room: ${slot.resourceId}
     Start: ${new Date(slot.start).toLocaleString()}
     End: ${new Date(calculatedEnd).toLocaleString()}
     Floor: ${floorName}
   `;
 
-  const adminsToNotify = ADMIN_NOTIFICATION_CONFIG
-    .filter(admin => admin.floors.includes(floor))
-    .map(admin => admin.email);
+    const adminsToNotify = ADMIN_NOTIFICATION_CONFIG
+      .filter(admin => admin.floors.includes(floor))
+      .map(admin => admin.email);
 
-  console.log("Admins to notify:", adminsToNotify);
+    console.log("Admins to notify:", adminsToNotify);
 
-  const token = accessToken || (await getFreshAccessToken());
-  if (!token) {
-    console.error("❌ No access token available for admin notifications.");
-    return;
-  }
-
-  for (const adminEmail of adminsToNotify) {
-    const success = await sendEmail(adminEmail, `New Booking Request - ${floorName}`, bookingDetails, token);
-    if (!success) {
-      console.warn(`⚠ Failed to notify admin: ${adminEmail}`);
+    for (const adminEmail of adminsToNotify) {
+      const success = await sendPendingEmail(adminEmail, `New Booking Request - ${floorName}`, bookingDetails);
+      if (!success) {
+        console.warn(`⚠ Failed to notify admin: ${adminEmail}`);
+      }
     }
-  }
-};
-
-
+  };
 
   // Submit booking
   const handleSubmitBooking = async (formData, calculatedEnd) => {

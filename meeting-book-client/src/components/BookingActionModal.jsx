@@ -2,7 +2,7 @@ import React from "react";
 import { updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../utils/firebase";
 import "./BookingActionModal.css";
-import { sendEmail } from "../utils/email";
+import { sendGraphEmail } from "../utils/email";  // Use Graph API for admin emails
 
 function BookingActionModal({ eventData, onClose, events, accessToken, getFreshAccessToken, adminEmail }) {
   if (!eventData) return null;
@@ -13,7 +13,7 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
       const floorCollection = eventData.floor === 10 ? "bookings_floor10" : "bookings_floor7";
       await updateDoc(doc(db, floorCollection, eventData.id), { status: "approved" });
 
-      // Send approval email to user
+      // Send approval email to user via Graph API
       if (eventData.userEmail) {
         const userMessage = `Hello ${eventData.name},\n\nYour booking for ${eventData.room} from ${new Date(
           eventData.start
@@ -21,9 +21,15 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
           eventData.end
         ).toLocaleString()} has been approved.\n\nThank you.`;
 
-        await sendEmail(eventData.userEmail, "Your Booking is Approved", userMessage, accessToken, getFreshAccessToken);
+        await sendGraphEmail(
+          eventData.userEmail,
+          "Your Booking is Approved",
+          userMessage,
+          accessToken,
+          getFreshAccessToken
+        );
 
-        // Send copy to admin who approved
+        // Send a copy to the admin who approved
         if (adminEmail) {
           const adminMessage = `You approved the booking for ${eventData.name} (${eventData.room}) from ${new Date(
             eventData.start
@@ -31,11 +37,17 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
             eventData.end
           ).toLocaleString()} on floor ${eventData.floor}.`;
 
-          await sendEmail(adminEmail, "You Approved a Booking", adminMessage, accessToken, getFreshAccessToken);
+          await sendGraphEmail(
+            adminEmail,
+            "You Approved a Booking",
+            adminMessage,
+            accessToken,
+            getFreshAccessToken
+          );
         }
       }
 
-      // Remove overlapping pending bookings for same room/floor
+      // Remove overlapping pending bookings for the same room/floor/time
       const overlappingPending = events.filter(
         (e) =>
           e.id !== eventData.id &&
@@ -62,21 +74,33 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
       const floorCollection = eventData.floor === 10 ? "bookings_floor10" : "bookings_floor7";
       await deleteDoc(doc(db, floorCollection, eventData.id));
 
-      // Send decline email to user
+      // Send decline email to user via Graph API
       if (eventData.userEmail) {
         const userMessage = `Hello ${eventData.name},\n\nUnfortunately, your booking for ${eventData.room} on ${new Date(
           eventData.start
         ).toLocaleString()} was declined.\n\nThank you.`;
 
-        await sendEmail(eventData.userEmail, "Your Booking Request Declined", userMessage, accessToken, getFreshAccessToken);
+        await sendGraphEmail(
+          eventData.userEmail,
+          "Your Booking Request Declined",
+          userMessage,
+          accessToken,
+          getFreshAccessToken
+        );
 
-        // Send copy to admin who declined
+        // Send a copy to the admin who declined
         if (adminEmail) {
           const adminMessage = `You declined the booking for ${eventData.name} (${eventData.room}) on ${new Date(
             eventData.start
           ).toLocaleString()} (floor ${eventData.floor}).`;
 
-          await sendEmail(adminEmail, "You Declined a Booking", adminMessage, accessToken, getFreshAccessToken);
+          await sendGraphEmail(
+            adminEmail,
+            "You Declined a Booking",
+            adminMessage,
+            accessToken,
+            getFreshAccessToken
+          );
         }
       }
     } catch (error) {
