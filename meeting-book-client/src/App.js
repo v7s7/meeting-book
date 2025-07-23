@@ -23,7 +23,7 @@ import { sendPendingEmail } from "./utils/email";  // Use NodeMailer for pending
 
 const ADMIN_NOTIFICATION_CONFIG = [
   { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
-  { email: "m.adail@swd.bh", floors: [7, 10] },
+  { email: "m.adil@swd.bh", floors: [7, 10] },
 ];
 
 // Helper to check if the current profile is an admin
@@ -89,7 +89,6 @@ function App() {
             username: profile.userPrincipalName || "",
             name: profile.displayName || "Unknown User",
             department: prev?.department || profile.department || "",
-            phone: profile.mobilePhone || prev?.phone || "",
           }));
 
           setIsAdmin(isAdminUser(profile.userPrincipalName));
@@ -227,8 +226,6 @@ const handleSlotSelect = info => {
     ---------------------------
     Name: ${userName}
     Email: ${currentUser?.username || "N/A"}
-    Phone: ${formData.phone}
-    CPR: ${formData.cpr}
     Department: ${formData.department || "N/A"}
     Room: ${slot.resourceId}
     Start: ${new Date(slot.start).toLocaleString()}
@@ -263,14 +260,12 @@ const handleSlotSelect = info => {
 
     await addDoc(collection(db, collectionName), {
       name: userName,
-      cpr: formData.cpr,
-      phone: formData.phone,
       department: formData.department || currentUser.department || "",
       room: selectedSlot.resourceId,
       start: selectedSlot.start,
       end: calculatedEnd,
       userId,
-      userEmail: userId,
+  userEmail: currentUser.username,  
       bookedBy: userName,
       floor: selectedFloor,
       status: "pending"
@@ -278,15 +273,11 @@ const handleSlotSelect = info => {
 
     await setDoc(doc(db, 'users', userId), {
       name: userName,
-      cpr: formData.cpr,
-      phone: formData.phone,
       department: formData.department || currentUser.department || ""
     });
 
     setUserLastBooking({
       name: userName,
-      cpr: formData.cpr,
-      phone: formData.phone,
       department: formData.department || currentUser.department || ""
     });
 
@@ -406,12 +397,17 @@ const handleSlotSelect = info => {
 
           {currentUser && (
             <BookingForm
-              slot={selectedSlot}
-              events={events}
-              onClose={() => setSelectedSlot(null)}
-              onSubmit={handleSubmitBooking}
-              lastUsedData={userLastBooking ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name } : { name: currentUser?.name || "", phone: currentUser?.phone || "", department: currentUser?.department || "", cpr: "" }}
-            />
+  slot={selectedSlot}
+  events={events}
+  onClose={() => setSelectedSlot(null)}
+  onSubmit={handleSubmitBooking}
+  lastUsedData={
+    userLastBooking
+      ? { ...userLastBooking, name: currentUser?.name || userLastBooking.name, username: currentUser?.username }
+      : { name: currentUser?.name || "", department: currentUser?.department || "", username: currentUser?.username }
+  }
+/>
+
           )}
 
           {manualBookingOpen && (

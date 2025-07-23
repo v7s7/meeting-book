@@ -4,8 +4,7 @@ import './BookingForm.css';
 function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
   const [formData, setFormData] = useState({
     name: '',
-    cpr: '',
-    phone: '',
+    email: '',
     department: ''
   });
   const [duration, setDuration] = useState(60);
@@ -13,14 +12,14 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
   const [calculatedEnd, setCalculatedEnd] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Auto-fill from lastUsedData but allow edits except name
-  useEffect(() => {
+  // Auto-fill from lastUsedData but allow edits except name/email
+ useEffect(() => {
   if (lastUsedData) {
     setFormData(prev => ({
       ...prev,
-      ...lastUsedData,
-      // Keep current department if user started typing
-      department: prev.department || lastUsedData.department || ''
+      name: lastUsedData.name || "",
+      email: lastUsedData.username || "",
+      department: prev.department || lastUsedData.department || ""
     }));
   }
 }, [lastUsedData]);
@@ -90,18 +89,17 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
   };
 
   const handleSubmit = (e) => {
-  e.preventDefault();
-  if (hasConflict || isSubmitting) return;
+    e.preventDefault();
+    if (hasConflict || isSubmitting) return;
 
-  setIsSubmitting(true);
-  onClose(); // Close immediately
+    setIsSubmitting(true);
+    onClose(); // Close immediately
 
-  // Run booking in background
-  onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd)
-    .catch((err) => console.error("Booking failed:", err))
-    .finally(() => setIsSubmitting(false));
-};
-
+    // Run booking in background
+    onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd)
+      .catch((err) => console.error("Booking failed:", err))
+      .finally(() => setIsSubmitting(false));
+  };
 
   if (!slot || !slot.start) return null;
 
@@ -139,40 +137,24 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
             style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed" }}
           />
 
-          <label>CPR:</label>
-          <input
-            type="text"
-            name="cpr"
-            placeholder="Enter CPR Number"
-            value={formData.cpr}
-            onChange={handleChange}
-            required
-          />
-
-          <label>Phone Number:</label>
-          <input
-            type="tel"
-            name="phone"
-            value={formData.phone}
-            onChange={(e) => {
-              const value = e.target.value.replace(/\D/g, '').slice(0, 8);
-              setFormData(prev => ({ ...prev, phone: value }));
-            }}
-            maxLength={8}
-            pattern="\d{8}"
-title="Please enter an 8-digit phone number"
-            required
-          />
-
-          <input
+          <label>Email:</label>
+<input
   type="text"
-  name="department"
-  value={formData.department}
-  onChange={handleChange}
-  placeholder="Enter Department"
-  required
+  name="email"
+  value={formData.email}
+  readOnly
+  style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed" }}
 />
 
+
+          <input
+            type="text"
+            name="department"
+            value={formData.department}
+            onChange={handleChange}
+            placeholder="Enter Department"
+            required
+          />
 
           {hasConflict && <p className="conflict">This slot is already booked in this room.</p>}
 
