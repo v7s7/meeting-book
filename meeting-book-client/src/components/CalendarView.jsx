@@ -46,10 +46,10 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedE
               slotMaxTime="18:00:00"
               longPressDelay={100}
               selectMinDistance={1}
-              selectAllow={() => true}
               allDaySlot={false}
               selectable={true}
               selectMirror={true}
+              resourceAreaHeaderContent="Rooms"
               height="61vh"
               headerToolbar={{
                 left: 'prev,next today',
@@ -57,30 +57,32 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedE
                 right: ''
               }}
               resources={
-                selectedFloor === 10
-                  ? [
-                      { id: 'Room 1', title: 'Room 1 (  Big Room )' },
-                      { id: 'Room 2', title: 'Room 2 (  Mid Room )' },
-                      { id: 'Room 3', title: 'Room 3 (  Small Room NO TV)'}
-                    ]
-                  : [
-                      { id: 'Room 1', title: 'Meeting Room' },
-                      { id: 'Room 2', title: 'Training Room' }
-                    ]
-              }
+  selectedFloor === 10
+    ? [
+        { id: 'Room1', title: 'Room 1 ( Big Room )' },
+        { id: 'Room2', title: 'Room 2 ( Mid Room )' },
+        { id: 'Room3', title: 'Room 3 ( Small Room NO TV )' }
+      ]
+    : [
+        { id: 'Room1', title: 'Meeting Room' },
+        { id: 'Room2', title: 'Training Room' }
+      ]
+}
+
               events={events.map(event => ({
                 ...event,
-                resourceId: event.room || 'Room 1',
-                floor: selectedFloor, // ensure floor info
+                resourceId: event.room,
+                floor: selectedFloor
               }))}
               eventContent={renderEventContent}
               select={(info) => {
-                onSelectSlot({
-                  start: info.startStr,
-                  end: info.endStr,
-                  resourceId: info.resource?.id || 'Room 1',
-                });
-              }}
+  onSelectSlot({
+    start: info.startStr,
+    end: info.endStr,
+    resourceId: info.resource?.id || null
+  });
+}}
+
               eventClick={handleEventClick}
             />
           </div>

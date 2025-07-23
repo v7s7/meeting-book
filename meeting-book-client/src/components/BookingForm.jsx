@@ -89,17 +89,19 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (hasConflict || isSubmitting) return;
+  const handleSubmit = (e) => {
+  e.preventDefault();
+  if (hasConflict || isSubmitting) return;
 
-    setIsSubmitting(true);
-    try {
-      await onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  setIsSubmitting(true);
+  onClose(); // Close immediately
+
+  // Run booking in background
+  onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd)
+    .catch((err) => console.error("Booking failed:", err))
+    .finally(() => setIsSubmitting(false));
+};
+
 
   if (!slot || !slot.start) return null;
 

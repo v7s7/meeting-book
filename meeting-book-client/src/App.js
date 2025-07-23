@@ -23,7 +23,7 @@ import { sendPendingEmail } from "./utils/email";  // Use NodeMailer for pending
 
 const ADMIN_NOTIFICATION_CONFIG = [
   { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
-  { email: "m.adil@swd.bh", floors: [7, 10] },
+  { email: "m.adail@swd.bh", floors: [7, 10] },
 ];
 
 // Helper to check if the current profile is an admin
@@ -193,13 +193,31 @@ function App() {
     });
   };
 
-  const handleSlotSelect = info => {
-    if (!currentUser) return alert("You must log in to book a meeting room.");
-    const start = new Date(info.start);
-    let end = new Date(info.end);
-    if (start.getTime() === end.getTime()) end = new Date(start.getTime() + 30 * 60 * 1000);
-    setSelectedSlot({ start: start.toISOString(), end: end.toISOString(), resourceId: info.resource?.id || 'Room 1' });
-  };
+const handleSlotSelect = info => {
+  if (!currentUser) {
+    alert("You must log in to book a meeting room.");
+    return;
+  }
+
+  if (!info.resourceId) {
+    alert("Please select a valid room.");
+    return;
+  }
+
+  const start = new Date(info.start);
+  let end = new Date(info.end);
+  if (start.getTime() === end.getTime()) {
+    end = new Date(start.getTime() + 30 * 60 * 1000);
+  }
+
+  setSelectedSlot({
+    start: start.toISOString(),
+    end: end.toISOString(),
+    resourceId: info.resourceId
+  });
+};
+
+
 
   // Notify admins about a pending booking
   const notifyAdminsPendingBooking = async (userName, formData, slot, calculatedEnd, floor) => {
@@ -235,6 +253,10 @@ function App() {
   // Submit booking
   const handleSubmitBooking = async (formData, calculatedEnd) => {
     if (!currentUser) return alert("Please log in with your Microsoft account to book.");
+    if (!selectedSlot || !selectedSlot.resourceId) {
+     alert("Please select a room before booking.");
+     return;
+   }
     const userId = currentUser.username;
     const userName = currentUser.name;
     const collectionName = selectedFloor === 10 ? 'bookings_floor10' : 'bookings_floor7';
