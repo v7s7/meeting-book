@@ -2,14 +2,14 @@ import React from "react";
 import { updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../utils/firebase";
 import "./BookingActionModal.css";
-import { sendGraphEmail } from "../utils/email";  // Use Graph API for admin emails
+import { sendGraphEmail } from "../utils/email"; // Use Graph API for admin emails
 
 function BookingActionModal({ eventData, onClose, events, accessToken, getFreshAccessToken, adminEmail }) {
   if (!eventData) return null;
 
   // Approve booking (UI closes instantly)
   const approveBooking = () => {
-    onClose(); // Close immediately
+    onClose(); // Close modal immediately
 
     (async () => {
       try {
@@ -24,13 +24,17 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
             eventData.end
           ).toLocaleString()} has been approved.\n\nThank you.`;
 
-          sendGraphEmail(
+          const userEmailResult = await sendGraphEmail(
             eventData.userEmail,
             "Your Booking is Approved",
             userMessage,
             accessToken,
             getFreshAccessToken
-          ).catch(err => console.error("Failed to send user approval email:", err));
+          );
+          if (!userEmailResult.success) {
+            console.error("Failed to send user approval email:", userEmailResult.error);
+            alert("Booking approved, but the email notification to the user failed.");
+          }
 
           // Send a copy to the admin who approved
           if (adminEmail) {
@@ -40,14 +44,19 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
               eventData.end
             ).toLocaleString()} on floor ${eventData.floor}.`;
 
-            sendGraphEmail(
+            const adminEmailResult = await sendGraphEmail(
               adminEmail,
               "You Approved a Booking",
               adminMessage,
               accessToken,
               getFreshAccessToken
-            ).catch(err => console.error("Failed to send admin approval email:", err));
+            );
+            if (!adminEmailResult.success) {
+              console.warn("Admin email failed to send:", adminEmailResult.error);
+            }
           }
+        } else {
+          console.warn("No user email found for this booking.");
         }
 
         // Remove overlapping pending bookings for the same room/floor/time
@@ -66,13 +75,14 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
         }
       } catch (error) {
         console.error("Error approving booking:", error);
+        alert("An error occurred while approving the booking. Check console logs.");
       }
     })();
   };
 
   // Decline booking (UI closes instantly)
   const removeBooking = () => {
-    onClose(); // Close immediately
+    onClose(); // Close modal immediately
 
     (async () => {
       try {
@@ -85,13 +95,17 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
             eventData.start
           ).toLocaleString()} was declined.\n\nThank you.`;
 
-          sendGraphEmail(
+          const userEmailResult = await sendGraphEmail(
             eventData.userEmail,
             "Your Booking Request Declined",
             userMessage,
             accessToken,
             getFreshAccessToken
-          ).catch(err => console.error("Failed to send user decline email:", err));
+          );
+          if (!userEmailResult.success) {
+            console.error("Failed to send user decline email:", userEmailResult.error);
+            alert("Booking declined, but the email notification to the user failed.");
+          }
 
           // Send a copy to the admin who declined
           if (adminEmail) {
@@ -99,17 +113,23 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
               eventData.start
             ).toLocaleString()} (floor ${eventData.floor}).`;
 
-            sendGraphEmail(
+            const adminEmailResult = await sendGraphEmail(
               adminEmail,
               "You Declined a Booking",
               adminMessage,
               accessToken,
               getFreshAccessToken
-            ).catch(err => console.error("Failed to send admin decline email:", err));
+            );
+            if (!adminEmailResult.success) {
+              console.warn("Admin decline email failed to send:", adminEmailResult.error);
+            }
           }
+        } else {
+          console.warn("No user email found for this booking.");
         }
       } catch (error) {
         console.error("Error removing booking:", error);
+        alert("An error occurred while declining the booking. Check console logs.");
       }
     })();
   };

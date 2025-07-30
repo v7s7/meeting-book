@@ -192,7 +192,7 @@ function App() {
     });
   };
 
-const handleSlotSelect = info => {
+const handleSlotSelect = (info) => {
   if (!currentUser) {
     alert("You must log in to book a meeting room.");
     return;
@@ -204,6 +204,12 @@ const handleSlotSelect = info => {
   }
 
   const start = new Date(info.start);
+
+  if (start < new Date()) {
+    alert("You cannot book a slot in the past.");
+    return;
+  }
+
   let end = new Date(info.end);
   if (start.getTime() === end.getTime()) {
     end = new Date(start.getTime() + 30 * 60 * 1000);
@@ -215,6 +221,7 @@ const handleSlotSelect = info => {
     resourceId: info.resourceId
   });
 };
+
 
 
 

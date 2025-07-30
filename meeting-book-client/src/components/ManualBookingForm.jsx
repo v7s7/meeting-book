@@ -7,21 +7,29 @@ function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
   const [time, setTime] = useState('');
   const [duration, setDuration] = useState(30); // Default 30 mins
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!date || !time) return;
+const handleSubmit = (e) => {
+  e.preventDefault();
+  if (!date || !time) return;
 
-    const start = new Date(`${date}T${time}`);
-    const end = new Date(start.getTime() + duration * 60000);
+  const start = new Date(`${date}T${time}`);
+  
+  // ✅ Prevent booking in the past
+  if (start < new Date()) {
+    alert("You cannot book a time in the past.");
+    return;
+  }
 
-    onSubmit({
-      start: start.toISOString(),
-      end: end.toISOString(),
-      resourceId: room
-    });
+  const end = new Date(start.getTime() + duration * 60000);
 
-    onClose();
-  };
+  onSubmit({
+    start: start.toISOString(),
+    end: end.toISOString(),
+    resourceId: room
+  });
+
+  onClose();
+};
+
 
   return (
     <div className="overlay">
@@ -31,7 +39,13 @@ function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
           <h3>Manual Booking</h3>
 
           <label>Date:</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+<input 
+  type="date" 
+  value={date} 
+  onChange={(e) => setDate(e.target.value)} 
+  min={new Date().toISOString().split("T")[0]} 
+  required 
+/>
 
           <label>Start Time:</label>
           <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required />

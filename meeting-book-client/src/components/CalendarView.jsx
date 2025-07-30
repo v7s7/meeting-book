@@ -51,24 +51,34 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedE
               selectMirror={true}
               resourceAreaHeaderContent="Rooms"
               height="61vh"
+              
+              
+              selectAllow={(selectInfo) => {
+                return new Date(selectInfo.start) > new Date();
+              }}
+
+//               selectAllow={(selectInfo) => {
+//   if (isAdmin) return true; // Admin can select any slot
+//   return new Date(selectInfo.start) > new Date(); // Normal users can't book in the past
+// }}
+
               headerToolbar={{
                 left: 'prev,next today',
                 center: 'title',
                 right: ''
               }}
               resources={
-  selectedFloor === 10
-    ? [
-        { id: 'Room1', title: 'Room 1 ( Big Room )' },
-        { id: 'Room2', title: 'Room 2 ( Mid Room )' },
-        { id: 'Room3', title: 'Room 3 ( Small Room NO TV )' }
-      ]
-    : [
-        { id: 'Room1', title: 'Meeting Room' },
-        { id: 'Room2', title: 'Training Room' }
-      ]
-}
-
+                selectedFloor === 10
+                  ? [
+                      { id: 'Room1', title: 'Room 1 ( Big Room )' },
+                      { id: 'Room2', title: 'Room 2 ( Mid Room )' },
+                      { id: 'Room3', title: 'Room 3 ( Small Room NO TV )' }
+                    ]
+                  : [
+                      { id: 'Room1', title: 'Meeting Room' },
+                      { id: 'Room2', title: 'Training Room' }
+                    ]
+              }
               events={events.map(event => ({
                 ...event,
                 resourceId: event.room,
@@ -76,13 +86,12 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedE
               }))}
               eventContent={renderEventContent}
               select={(info) => {
-  onSelectSlot({
-    start: info.startStr,
-    end: info.endStr,
-    resourceId: info.resource?.id || null
-  });
-}}
-
+                onSelectSlot({
+                  start: info.startStr,
+                  end: info.endStr,
+                  resourceId: info.resource?.id || null
+                });
+              }}
               eventClick={handleEventClick}
             />
           </div>

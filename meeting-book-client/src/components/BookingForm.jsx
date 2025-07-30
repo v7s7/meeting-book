@@ -147,14 +147,21 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
 />
 
 
-          <input
-            type="text"
-            name="department"
-            value={formData.department}
-            onChange={handleChange}
-            placeholder="Enter Department"
-            required
-          />
+        <select
+  name="department"
+  value={formData.department}
+  onChange={handleChange}
+  required
+>
+  <option value="">Select Department</option>
+  <option value="HR">HR</option>
+  <option value="Finance">Finance</option>
+  <option value="IT">IT</option>
+  <option value="Operations">Operations</option>
+  <option value="Admin">Admin</option>
+  <option value="Marketing">Marketing</option>
+</select>
+
 
           {hasConflict && <p className="conflict">This slot is already booked in this room.</p>}
 
