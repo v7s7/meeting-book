@@ -69,7 +69,7 @@ app.post('/send-email', async (req, res) => {
     });
 
     const mailOptions = {
-      from: `"Meeting Booking" <noreply@swd.bh>`, // Use a valid email address for 'from'
+      from: `"Meeting Booking" <booking@swd.bh>`, // Use a valid email address for 'from'
       to,
       subject,
       text: message,

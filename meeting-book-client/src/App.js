@@ -22,7 +22,7 @@ import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { sendPendingEmail } from "./utils/email";  // Use NodeMailer for pending emails
 
 const ADMIN_NOTIFICATION_CONFIG = [
-  { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
+  { email: "a.alkubaesya@swd.bh", floors: [7, 10] },
   { email: "m.adil@swd.bh", floors: [7, 10] },
 ];
 

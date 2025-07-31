@@ -7,16 +7,15 @@ import { sendGraphEmail } from "../utils/email"; // Use Graph API for admin emai
 function BookingActionModal({ eventData, onClose, events, accessToken, getFreshAccessToken, adminEmail }) {
   if (!eventData) return null;
 
-  // Approve booking (UI closes instantly)
   const approveBooking = () => {
-    onClose(); // Close modal immediately
+    onClose();
 
     (async () => {
       try {
         const floorCollection = eventData.floor === 10 ? "bookings_floor10" : "bookings_floor7";
         await updateDoc(doc(db, floorCollection, eventData.id), { status: "approved" });
 
-        // Send approval email to user via Graph API
+        // Email user about approval
         if (eventData.userEmail) {
           const userMessage = `Hello ${eventData.name},\n\nYour booking for ${eventData.room} from ${new Date(
             eventData.start
@@ -36,30 +35,22 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
             alert("Booking approved, but the email notification to the user failed.");
           }
 
-          // Send a copy to the admin who approved
           if (adminEmail) {
             const adminMessage = `You approved the booking for ${eventData.name} (${eventData.room}) from ${new Date(
               eventData.start
-            ).toLocaleString()} to ${new Date(
-              eventData.end
-            ).toLocaleString()} on floor ${eventData.floor}.`;
+            ).toLocaleString()} to ${new Date(eventData.end).toLocaleString()} on floor ${eventData.floor}.`;
 
-            const adminEmailResult = await sendGraphEmail(
+            await sendGraphEmail(
               adminEmail,
               "You Approved a Booking",
               adminMessage,
               accessToken,
               getFreshAccessToken
             );
-            if (!adminEmailResult.success) {
-              console.warn("Admin email failed to send:", adminEmailResult.error);
-            }
           }
-        } else {
-          console.warn("No user email found for this booking.");
         }
 
-        // Remove overlapping pending bookings for the same room/floor/time
+        // Auto-decline overlapping pending bookings
         const overlappingPending = events.filter(
           (e) =>
             e.id !== eventData.id &&
@@ -72,6 +63,36 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
 
         for (const booking of overlappingPending) {
           await deleteDoc(doc(db, floorCollection, booking.id));
+
+          // Notify the declined user
+          if (booking.userEmail) {
+            const message = `Hello ${booking.name},\n\nYour booking for ${booking.room} on ${new Date(
+              booking.start
+            ).toLocaleString()} was automatically declined because another booking was approved for that time.\n\nThank you.`;
+
+            await sendGraphEmail(
+              booking.userEmail,
+              "Booking Request Declined Due to Conflict",
+              message,
+              accessToken,
+              getFreshAccessToken
+            );
+          }
+
+          // Notify the admin
+          if (adminEmail) {
+            const adminConflictMessage = `You approved a booking which caused the auto-decline of ${booking.name}'s booking (${booking.room}) from ${new Date(
+              booking.start
+            ).toLocaleString()} to ${new Date(booking.end).toLocaleString()} on floor ${booking.floor}.`;
+
+            await sendGraphEmail(
+              adminEmail,
+              "Auto-Declined Booking",
+              adminConflictMessage,
+              accessToken,
+              getFreshAccessToken
+            );
+          }
         }
       } catch (error) {
         console.error("Error approving booking:", error);
@@ -80,52 +101,52 @@ function BookingActionModal({ eventData, onClose, events, accessToken, getFreshA
     })();
   };
 
-  // Decline booking (UI closes instantly)
   const removeBooking = () => {
-    onClose(); // Close modal immediately
+    onClose();
 
     (async () => {
       try {
         const floorCollection = eventData.floor === 10 ? "bookings_floor10" : "bookings_floor7";
         await deleteDoc(doc(db, floorCollection, eventData.id));
 
-        // Send decline email to user via Graph API
+        // Notify user
         if (eventData.userEmail) {
-          const userMessage = `Hello ${eventData.name},\n\nUnfortunately, your booking for ${eventData.room} on ${new Date(
-            eventData.start
-          ).toLocaleString()} was declined.\n\nThank you.`;
+          const message =
+            eventData.status === "approved"
+              ? `Hello ${eventData.name},\n\nYour previously approved booking for ${eventData.room} on ${new Date(
+                  eventData.start
+                ).toLocaleString()} has been cancelled by the admin.\n\nWe apologize for the inconvenience.`
+              : `Hello ${eventData.name},\n\nUnfortunately, your booking for ${eventData.room} on ${new Date(
+                  eventData.start
+                ).toLocaleString()} was declined.\n\nThank you.`;
 
-          const userEmailResult = await sendGraphEmail(
+          await sendGraphEmail(
             eventData.userEmail,
-            "Your Booking Request Declined",
-            userMessage,
+            eventData.status === "approved" ? "Your Booking Was Cancelled" : "Your Booking Request Declined",
+            message,
             accessToken,
             getFreshAccessToken
           );
-          if (!userEmailResult.success) {
-            console.error("Failed to send user decline email:", userEmailResult.error);
-            alert("Booking declined, but the email notification to the user failed.");
-          }
+        }
 
-          // Send a copy to the admin who declined
-          if (adminEmail) {
-            const adminMessage = `You declined the booking for ${eventData.name} (${eventData.room}) on ${new Date(
-              eventData.start
-            ).toLocaleString()} (floor ${eventData.floor}).`;
+        // Notify admin
+        if (adminEmail) {
+          const adminMsg =
+            eventData.status === "approved"
+              ? `You cancelled an approved booking for ${eventData.name} (${eventData.room}) on ${new Date(
+                  eventData.start
+                ).toLocaleString()} (floor ${eventData.floor}).`
+              : `You declined the pending booking for ${eventData.name} (${eventData.room}) on ${new Date(
+                  eventData.start
+                ).toLocaleString()} (floor ${eventData.floor}).`;
 
-            const adminEmailResult = await sendGraphEmail(
-              adminEmail,
-              "You Declined a Booking",
-              adminMessage,
-              accessToken,
-              getFreshAccessToken
-            );
-            if (!adminEmailResult.success) {
-              console.warn("Admin decline email failed to send:", adminEmailResult.error);
-            }
-          }
-        } else {
-          console.warn("No user email found for this booking.");
+          await sendGraphEmail(
+            adminEmail,
+            "Booking Removed",
+            adminMsg,
+            accessToken,
+            getFreshAccessToken
+          );
         }
       } catch (error) {
         console.error("Error removing booking:", error);

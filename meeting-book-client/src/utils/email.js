@@ -1,4 +1,4 @@
-// For pending booking notifications (NodeMailer)
+// ✅ Send email using NodeMailer (for pending booking notifications to admins)
 export const sendPendingEmail = async (to, subject, message) => {
   try {
     const backendUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -22,10 +22,10 @@ export const sendPendingEmail = async (to, subject, message) => {
   }
 };
 
-// For approve/decline booking notifications (Microsoft Graph)
+// ✅ Send email using Microsoft Graph API (for approved/declined/cancelled/auto-declined notifications)
 export const sendGraphEmail = async (to, subject, message, accessToken, getFreshAccessToken) => {
   try {
-    // Ensure we have a valid MSAL access token
+    // Attempt to use existing token, or get a fresh one
     let token = accessToken;
     if (!token && typeof getFreshAccessToken === 'function') {
       token = await getFreshAccessToken();
