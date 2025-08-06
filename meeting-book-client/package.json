@@ -4,8 +4,6 @@
   "private": true,
   "homepage": ".",
   "dependencies": {
-    "@azure/msal-browser": "^4.15.0",
-    "@azure/msal-react": "^3.0.15",
     "@fullcalendar/interaction": "^6.1.18",
     "@fullcalendar/react": "^6.1.18",
     "@fullcalendar/resource-timegrid": "^6.1.18",

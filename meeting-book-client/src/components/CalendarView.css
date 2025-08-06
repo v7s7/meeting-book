@@ -137,18 +137,21 @@ h2 {
 
 /* App Header */
 .app-header {
-  background: #2e3b4e;
-  color: #fff;
-  padding: 10px 20px;
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* Ensures logo/title on left, user info on right */
   align-items: center;
+  background-color: #ffffff;
+  padding: 10px 20px;
+  border-bottom: 1px solid #ccc;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .app-header h2 {
-  color: #fff;
+  color: #2c3e50;
+  font-size: 1.6em;
+  margin: 0;
+  text-align: left; /* Align text inside the element */
 }
-
 .btn-login {
   background: #3498db;
   color: #fff;
@@ -263,4 +266,3 @@ button {
     min-height: 60px !important;
   }
 }
-

@@ -33,7 +33,6 @@ function CalendarView({ events, onSelectSlot, isAdmin, currentUser, setSelectedE
             <div id="calendar-toolbar" />
             {currentUser && (
               <div className="user-info">
-                Logged in as: <strong>{currentUser.name}</strong>
               </div>
             )}
           </div>

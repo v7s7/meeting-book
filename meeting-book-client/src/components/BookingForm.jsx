@@ -1,41 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import './BookingForm.css';
 
-function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
+function BookingForm({ slot, events, onClose, onSubmit, loggedInUser }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     department: ''
   });
+
   const [duration, setDuration] = useState(60);
   const [hasConflict, setHasConflict] = useState(false);
   const [calculatedEnd, setCalculatedEnd] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Auto-fill from lastUsedData but allow edits except name/email
- useEffect(() => {
-  if (lastUsedData) {
-    setFormData(prev => ({
-      ...prev,
-      name: lastUsedData.name || "",
-      email: lastUsedData.username || "",
-      department: prev.department || lastUsedData.department || ""
-    }));
-  }
-}, [lastUsedData]);
-
+  useEffect(() => {
+    if (loggedInUser) {
+      setFormData(prev => ({
+        ...prev,
+        name: loggedInUser.name || '',
+email: loggedInUser.email || loggedInUser.username || '',
+        department: prev.department || loggedInUser.department || ''
+      }));
+    }
+  }, [loggedInUser]);
 
   useEffect(() => {
-    if (!slot || !slot.start || !slot.end) return;
-
+    if (!slot?.start || !slot?.end) return;
     const start = new Date(slot.start);
     const end = new Date(slot.end);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
-
-    const diffMs = end - start;
-    const diffMins = Math.round(diffMs / 60000);
+    if (isNaN(start) || isNaN(end)) return;
+    const diffMins = Math.round((end - start) / 60000);
     const defaultDuration = Math.min(diffMins, 300);
-
     setDuration(defaultDuration);
     updateCalculatedEnd(defaultDuration);
   }, [slot]);
@@ -45,15 +40,11 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
   }, [duration]);
 
   const updateCalculatedEnd = (durationMinutes) => {
-    if (!slot || !slot.start) return;
-
+    if (!slot?.start) return;
     const start = new Date(slot.start);
-    if (isNaN(start.getTime())) return;
-
     const newEnd = new Date(start.getTime() + durationMinutes * 60000);
     setCalculatedEnd(newEnd.toISOString());
 
-    // Check if an approved booking exists
     const hasApprovedConflict = events.some(ev => {
       const evStart = new Date(ev.start);
       const evEnd = new Date(ev.end);
@@ -65,7 +56,6 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
       );
     });
 
-    // Count pending bookings that overlap
     const pendingCount = events.filter(ev => {
       const evStart = new Date(ev.start);
       const evEnd = new Date(ev.end);
@@ -91,17 +81,14 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (hasConflict || isSubmitting) return;
-
     setIsSubmitting(true);
-    onClose(); // Close immediately
-
-    // Run booking in background
+    onClose();
     onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd)
-      .catch((err) => console.error("Booking failed:", err))
+      .catch(err => console.error("Booking failed:", err))
       .finally(() => setIsSubmitting(false));
   };
 
-  if (!slot || !slot.start) return null;
+  if (!slot?.start) return null;
 
   return (
     <div className="overlay">
@@ -138,30 +125,29 @@ function BookingForm({ slot, events, onClose, onSubmit, lastUsedData }) {
           />
 
           <label>Email:</label>
-<input
-  type="text"
-  name="email"
-  value={formData.email}
-  readOnly
-  style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed" }}
-/>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            readOnly
+            style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed" }}
+          /> 
 
-
-        <select
-  name="department"
-  value={formData.department}
-  onChange={handleChange}
-  required
->
-  <option value="">Select Department</option>
-  <option value="HR">HR</option>
-  <option value="Finance">Finance</option>
-  <option value="IT">IT</option>
-  <option value="Operations">Operations</option>
-  <option value="Admin">Admin</option>
-  <option value="Marketing">Marketing</option>
-</select>
-
+          <label>Department:</label>
+          <select
+            name="department"
+            value={formData.department}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Department</option>
+            <option value="HR">HR</option>
+            <option value="Finance">Finance</option>
+            <option value="IT">IT</option>
+            <option value="Operations">Operations</option>
+            <option value="Admin">Admin</option>
+            <option value="Marketing">Marketing</option>
+          </select>
 
           {hasConflict && <p className="conflict">This slot is already booked in this room.</p>}
 
