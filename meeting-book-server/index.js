@@ -13,9 +13,6 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// ✅ Google Sheets integration
-app.use('/', googleSheetsRoutes);
-
 // ✅ LDAP Login route
 app.post('/login', (req, res) => {
   const { username, password } = req.body;

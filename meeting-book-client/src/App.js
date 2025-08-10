@@ -25,7 +25,7 @@ const ADMIN_NOTIFICATION_CONFIG = [
   // { email: "m.adil@swd.bh", floors: [7, 10] },
 ];
 
-// Helper: resolve same-origin backend/app URLs unless explicitly set via env
+// ✅ Same-origin by default (works on new server without hardcoding)
 const API_BASE =
   process.env.REACT_APP_API_URL ||
   (typeof window !== "undefined" ? window.location.origin : "");
@@ -51,7 +51,6 @@ function App() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   useEffect(() => {
-    // Auto-login if saved
     const savedUser = localStorage.getItem("meetingUser");
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
@@ -111,7 +110,6 @@ function App() {
 
   const handleLogin = async () => {
     const { username, password } = loginForm;
-
     if (!username || !password) {
       return alert("Please enter your username and password.");
     }
@@ -146,7 +144,7 @@ function App() {
     setIsAdmin(false);
     setLoginForm({ username: "", password: "" });
     localStorage.removeItem("meetingUser");
-    window.location.reload(); // 🔄 Force reload to clear state
+    window.location.reload();
   };
 
   const handleSlotSelect = (info) => {
