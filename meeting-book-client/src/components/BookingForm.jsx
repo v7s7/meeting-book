@@ -5,24 +5,34 @@ function BookingForm({ slot, events, onClose, onSubmit, loggedInUser }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    department: ''
+    department: '',
+    customDepartment: ''
   });
 
   const [duration, setDuration] = useState(60);
   const [hasConflict, setHasConflict] = useState(false);
   const [calculatedEnd, setCalculatedEnd] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOtherSelected, setIsOtherSelected] = useState(false);
 
+ useEffect(() => {
+  if (loggedInUser) {
+    setFormData({
+      name: loggedInUser.name || '',
+      email: loggedInUser.email || loggedInUser.username || '',
+      department: loggedInUser.department || '',
+      customDepartment: loggedInUser.customDepartment || ''
+    });
+  }
+  // only run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+
+  // Sync isOtherSelected based on loaded department
   useEffect(() => {
-    if (loggedInUser) {
-      setFormData(prev => ({
-        ...prev,
-        name: loggedInUser.name || '',
-email: loggedInUser.email || loggedInUser.username || '',
-        department: prev.department || loggedInUser.department || ''
-      }));
-    }
-  }, [loggedInUser]);
+    setIsOtherSelected(formData.department === 'Other');
+  }, [formData.department]);
 
   useEffect(() => {
     if (!slot?.start || !slot?.end) return;
@@ -75,7 +85,11 @@ email: loggedInUser.email || loggedInUser.username || '',
   };
 
   const handleChange = (e) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -83,12 +97,33 @@ email: loggedInUser.email || loggedInUser.username || '',
     if (hasConflict || isSubmitting) return;
     setIsSubmitting(true);
     onClose();
-    onSubmit({ ...formData, room: slot.resourceId }, calculatedEnd)
+
+    const finalDepartment =
+      formData.department === "Other"
+        ? formData.customDepartment
+        : formData.department;
+
+    const isCustom = formData.department === "Other";
+
+onSubmit(
+  {
+    ...formData,
+    department: isCustom ? "Other" : formData.department,
+    customDepartment: isCustom ? formData.customDepartment : "",
+    room: slot.resourceId
+  },
+  calculatedEnd
+)
+
       .catch(err => console.error("Booking failed:", err))
       .finally(() => setIsSubmitting(false));
   };
 
   if (!slot?.start) return null;
+
+  const departmentOptions = [
+    "HR", "Finance", "IT", "Operations", "Admin", "Marketing", "Other"
+  ];
 
   return (
     <div className="overlay">
@@ -131,7 +166,7 @@ email: loggedInUser.email || loggedInUser.username || '',
             value={formData.email}
             readOnly
             style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed" }}
-          /> 
+          />
 
           <label>Department:</label>
           <select
@@ -140,14 +175,28 @@ email: loggedInUser.email || loggedInUser.username || '',
             onChange={handleChange}
             required
           >
-            <option value="">Select Department</option>
-            <option value="HR">HR</option>
-            <option value="Finance">Finance</option>
-            <option value="IT">IT</option>
-            <option value="Operations">Operations</option>
-            <option value="Admin">Admin</option>
-            <option value="Marketing">Marketing</option>
+<option value="" disabled hidden>
+  {formData.department === "Other" && formData.customDepartment
+    ? "Other"
+    : "Select Department"}
+</option>
+            {departmentOptions.map(dept => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
           </select>
+
+          {isOtherSelected && (
+            <>
+              <label>Enter Department:</label>
+              <input
+                type="text"
+                name="customDepartment"
+                value={formData.customDepartment || ""}
+                onChange={handleChange}
+                required
+              />
+            </>
+          )}
 
           {hasConflict && <p className="conflict">This slot is already booked in this room.</p>}
 

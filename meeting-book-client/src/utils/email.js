@@ -2,8 +2,9 @@
 export const sendEmail = async (to, subject, message, fromEmail) => {
   try {
     // Use LAN IP or localhost depending on .env
-const backendUrl = process.env.REACT_APP_API_URL || "http://10.27.16.58:5000";
-
+const backendUrl =
+   process.env.REACT_APP_API_URL ||
+   (typeof window !== "undefined" ? window.location.origin : "");
     // Normalize sender email to ensure valid format
     const normalizedSender = fromEmail?.includes("@") ? fromEmail : `${fromEmail}@swd.bh`;
 

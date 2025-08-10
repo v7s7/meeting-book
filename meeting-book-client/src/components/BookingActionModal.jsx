@@ -15,16 +15,22 @@ function BookingActionModal({ eventData, onClose, events, adminEmail }) {
         const floorCollection = eventData.floor === 10 ? "bookings_floor10" : "bookings_floor7";
         await updateDoc(doc(db, floorCollection, eventData.id), { status: "approved" });
 
+        const displayDept =
+          eventData.department === "Other"
+            ? eventData.customDepartment || "Other"
+            : eventData.department;
+
         if (eventData.userEmail) {
-          const userMessage = `Hello ${eventData.name},\n\nYour booking for ${eventData.room} from ${new Date(
+          const userMessage = `Dear ${eventData.name},\n\nYour reservation for ${eventData.room} from ${new Date(
             eventData.start
-          ).toLocaleString()} to ${new Date(eventData.end).toLocaleString()} has been approved.\n\nThank you.`;
+          ).toLocaleString()} to ${new Date(eventData.end).toLocaleString()} has been successfully approved.\n\nBest regards,\nSWD Booking Team`;
+
 
           const result = await sendEmail(
             eventData.userEmail,
             "Your Booking is Approved",
             userMessage,
-            adminEmail // ✅ send from admin
+            adminEmail
           );
           if (!result.success) {
             console.error("Failed to send user approval email:", result.error);
@@ -33,7 +39,7 @@ function BookingActionModal({ eventData, onClose, events, adminEmail }) {
 
           const adminMessage = `You approved the booking for ${eventData.name} (${eventData.room}) from ${new Date(
             eventData.start
-          ).toLocaleString()} to ${new Date(eventData.end).toLocaleString()} on floor ${eventData.floor}.`;
+          ).toLocaleString()} to ${new Date(eventData.end).toLocaleString()} on floor ${eventData.floor}.\n\nDepartment: ${displayDept}`;
 
           await sendEmail(adminEmail, "You Approved a Booking", adminMessage, adminEmail);
         }
@@ -60,7 +66,7 @@ function BookingActionModal({ eventData, onClose, events, adminEmail }) {
               booking.userEmail,
               "Booking Request Declined Due to Conflict",
               message,
-              adminEmail // ✅ from admin
+              adminEmail
             );
           }
 
@@ -99,7 +105,7 @@ function BookingActionModal({ eventData, onClose, events, adminEmail }) {
             eventData.userEmail,
             eventData.status === "approved" ? "Your Booking Was Cancelled" : "Your Booking Request Declined",
             message,
-            adminEmail // ✅ from admin
+            adminEmail
           );
         }
 
@@ -120,12 +126,17 @@ function BookingActionModal({ eventData, onClose, events, adminEmail }) {
     })();
   };
 
+  const displayDept =
+    eventData.department === "Other"
+      ? eventData.customDepartment || "Other"
+      : eventData.department;
+
   return (
     <div className="modal-overlay">
       <div className="modal-content">
         <h3>Booking Details</h3>
         <p><strong>Name:</strong> {eventData.name}</p>
-        <p><strong>Department:</strong> {eventData.department}</p>
+        <p><strong>Department:</strong> {displayDept}</p>
         <p><strong>Room:</strong> {eventData.room || 'Not specified'}</p>
         <p><strong>Start:</strong> {new Date(eventData.start).toLocaleString()}</p>
         <p><strong>End:</strong> {new Date(eventData.end).toLocaleString()}</p>

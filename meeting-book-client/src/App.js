@@ -21,10 +21,18 @@ import { sendEmail } from "./utils/email";
 import './App.css';
 
 const ADMIN_NOTIFICATION_CONFIG = [
-  { email: "a.alkubaesy@swd.bh", floors: [7,10] },
-    // { email: "m.adil@swd.bh", floors: [7, 10] },
-
+  { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
+  // { email: "m.adil@swd.bh", floors: [7, 10] },
 ];
+
+// Helper: resolve same-origin backend/app URLs unless explicitly set via env
+const API_BASE =
+  process.env.REACT_APP_API_URL ||
+  (typeof window !== "undefined" ? window.location.origin : "");
+
+const APP_URL =
+  process.env.REACT_APP_APP_URL ||
+  (typeof window !== "undefined" ? window.location.origin : "http://localhost:5000");
 
 function isAdminUser(email) {
   return ADMIN_NOTIFICATION_CONFIG.some(admin => admin.email === email);
@@ -35,13 +43,12 @@ function App() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [userLastBooking, setUserLastBooking] = useState(null);
+  const [, setUserLastBooking] = useState(null);
   const [manualBookingOpen, setManualBookingOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [selectedFloor, setSelectedFloor] = useState(10);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-
 
   useEffect(() => {
     // Auto-login if saved
@@ -58,10 +65,19 @@ function App() {
     const collectionName = selectedFloor === 10 ? "bookings_floor10" : "bookings_floor7";
     const unsub = onSnapshot(collection(db, collectionName), snapshot => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setEvents(data.map(event => ({
-        ...event,
-        title: event.department ? `${event.name} – ${event.department}` : event.name,
-      })));
+      setEvents(
+        data.map(event => {
+          const deptDisplay =
+            event.department === "Other"
+              ? event.customDepartment || "Other"
+              : event.department;
+
+          return {
+            ...event,
+            title: deptDisplay ? `${event.name} – ${deptDisplay}` : event.name,
+          };
+        })
+      );
     });
     return () => unsub();
   }, [selectedFloor]);
@@ -75,7 +91,16 @@ function App() {
         if (userSnap.exists()) {
           const data = userSnap.data();
           setUserLastBooking(data);
-          setCurrentUser(prev => ({ ...prev, department: data.department || prev?.department || "" }));
+          setCurrentUser(prev => ({
+            ...prev,
+            department: data.department || prev?.department || "",
+            customDepartment: data.customDepartment || ""
+          }));
+          localStorage.setItem("meetingUser", JSON.stringify({
+            ...currentUser,
+            department: data.department || "",
+            customDepartment: data.customDepartment || ""
+          }));
         }
       } catch (err) {
         console.error("Failed to fetch user data:", err);
@@ -92,7 +117,7 @@ function App() {
     }
 
     try {
-const res = await fetch(`${process.env.REACT_APP_API_URL}/login`, {
+      const res = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -117,13 +142,12 @@ const res = await fetch(`${process.env.REACT_APP_API_URL}/login`, {
   };
 
   const handleLogout = () => {
-  setCurrentUser(null);
-  setIsAdmin(false);
-  setLoginForm({ username: "", password: "" });
-  localStorage.removeItem("meetingUser");
-  window.location.reload(); // 🔄 Force reload to clear state
-};
-
+    setCurrentUser(null);
+    setIsAdmin(false);
+    setLoginForm({ username: "", password: "" });
+    localStorage.removeItem("meetingUser");
+    window.location.reload(); // 🔄 Force reload to clear state
+  };
 
   const handleSlotSelect = (info) => {
     if (!currentUser) {
@@ -155,39 +179,41 @@ const res = await fetch(`${process.env.REACT_APP_API_URL}/login`, {
   };
 
   const notifyAdminsPendingBooking = async (userName, formData, slot, calculatedEnd, floor) => {
-  const floorName = floor === 10 ? "10th Floor" : "7th Floor";
-  const bookingDetails = `
+    const floorName = floor === 10 ? "10th Floor" : "7th Floor";
+    const deptDisplay =
+      formData.department === "Other" ? formData.customDepartment || "Other" : formData.department;
+
+    const bookingDetails = `
 New Booking Request (Pending)
 
 Name: ${userName}
 Email: ${currentUser?.username || "N/A"}
-Department: ${formData.department || "N/A"}
+Department: ${deptDisplay}
 Room: ${slot.resourceId}
 Start: ${new Date(slot.start).toLocaleString()}
 End: ${new Date(calculatedEnd).toLocaleString()}
 Floor: ${floorName}
 
 Review & manage bookings:
-http://10.27.16.58:3000
+${APP_URL}
 `;
 
-  const adminsToNotify = ADMIN_NOTIFICATION_CONFIG
-    .filter(admin => admin.floors.includes(floor))
-    .map(admin => admin.email);
+    const adminsToNotify = ADMIN_NOTIFICATION_CONFIG
+      .filter(admin => admin.floors.includes(floor))
+      .map(admin => admin.email);
 
-  for (const adminEmail of adminsToNotify) {
-    const result = await sendEmail(
-      adminEmail,
-      `New Booking Request - ${floorName}`,
-      bookingDetails,
-      currentUser?.username
-    );
-    if (!result.success) {
-      console.warn(`⚠ Failed to notify admin: ${adminEmail}`);
+    for (const adminEmail of adminsToNotify) {
+      const result = await sendEmail(
+        adminEmail,
+        `New Booking Request - ${floorName}`,
+        bookingDetails,
+        currentUser?.username
+      );
+      if (!result.success) {
+        console.warn(`⚠ Failed to notify admin: ${adminEmail}`);
+      }
     }
-  }
-};
-
+  };
 
   const handleSubmitBooking = async (formData, calculatedEnd) => {
     if (!currentUser) return alert("Please log in to book.");
@@ -202,7 +228,8 @@ http://10.27.16.58:3000
 
     await addDoc(collection(db, collectionName), {
       name: userName,
-      department: formData.department || currentUser.department || "",
+      department: formData.department === "Other" ? "Other" : formData.department,
+      customDepartment: formData.department === "Other" ? formData.customDepartment : "",
       room: selectedSlot.resourceId,
       start: selectedSlot.start,
       end: calculatedEnd,
@@ -215,7 +242,8 @@ http://10.27.16.58:3000
 
     await setDoc(doc(db, 'users', userId), {
       name: userName,
-      department: formData.department || currentUser.department || ""
+      department: formData.department === "Other" ? "Other" : formData.department,
+      customDepartment: formData.department === "Other" ? formData.customDepartment : "",
     });
 
     setUserLastBooking({
@@ -250,27 +278,24 @@ http://10.27.16.58:3000
 
   return (
     <div>
- <header className="app-header">
-  <div className="left-section">
-    <img className="imgLogo" src="/logo.png" alt="App Logo" />
-    <h2 className="titleheader">Meeting Booking System</h2>
-  </div>
+      <header className="app-header">
+        <div className="left-section">
+          <img className="imgLogo" src="/logo.png" alt="App Logo" />
+          <h2 className="titleheader">Meeting Booking System</h2>
+        </div>
 
-  {currentUser && currentUser.name ? (
-    <div className="header-user-info">
-      <span>
-        Welcome, <strong>{currentUser.name}</strong>
-        {isAdmin && <span className="admin-badge">( Admin )</span>}
-      </span>
-      <button className="logout-btn" onClick={handleLogout}>Logout</button>
-    </div>
-  ) : (
-    <button className="login-btn" onClick={() => setLoginModalOpen(true)}>Login</button>
-  )}
-</header>
-
-
-     
+        {currentUser && currentUser.name ? (
+          <div className="header-user-info">
+            <span>
+              Welcome, <strong>{currentUser.name}</strong>
+              {isAdmin && <span className="admin-badge">( Admin )</span>}
+            </span>
+            <button className="logout-btn" onClick={handleLogout}>Logout</button>
+          </div>
+        ) : (
+          <button className="login-btn" onClick={() => setLoginModalOpen(true)}>Login</button>
+        )}
+      </header>
 
       {isAdmin && selectedEvent && (
         <BookingActionModal
@@ -290,19 +315,19 @@ http://10.27.16.58:3000
       ) : (
         <>
           <FloorSelector selectedFloor={selectedFloor} onChange={setSelectedFloor} />
- <div className="login-wrapper" style={{ margin: "10px 0" }}>
-        <button
-          onClick={() => {
-            if (!currentUser) {
-              alert("Please log in first.");
-              return;
-            }
-            setManualBookingOpen(true);
-          }}
-        >
-          Book Manually
-        </button>
-      </div>
+          <div className="login-wrapper" style={{ margin: "10px 0" }}>
+            <button
+              onClick={() => {
+                if (!currentUser) {
+                  alert("Please log in first.");
+                  return;
+                }
+                setManualBookingOpen(true);
+              }}
+            >
+              Book Manually
+            </button>
+          </div>
           <CalendarView
             events={events}
             onSelectSlot={handleSlotSelect}
@@ -329,20 +354,18 @@ http://10.27.16.58:3000
               onSubmit={(slot) => setSelectedSlot(slot)}
               selectedFloor={selectedFloor}
             />
-            
-            
           )}
-          <LoginModal
-  open={loginModalOpen}
-  onClose={() => setLoginModalOpen(false)}
-  loginForm={loginForm}
-  setLoginForm={setLoginForm}
-  onLogin={() => {
-    setLoginModalOpen(false);
-    handleLogin();
-  }}
-/>
 
+          <LoginModal
+            open={loginModalOpen}
+            onClose={() => setLoginModalOpen(false)}
+            loginForm={loginForm}
+            setLoginForm={setLoginForm}
+            onLogin={() => {
+              setLoginModalOpen(false);
+              handleLogin();
+            }}
+          />
         </>
       )}
     </div>
