@@ -5,6 +5,7 @@ const googleSheetsRoutes = require('./googleSheets');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const ldap = require('ldapjs');
+const os = require('os');
 require('dotenv').config();
 
 const app = express();
@@ -12,6 +13,24 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(bodyParser.json());
+
+// ✅ Prefer logging a 10.x address if present (falls back to first external or localhost)
+function getLocalIPv4(preferPrefix = '10.') {
+  const nets = os.networkInterfaces();
+  let fallback = null;
+  for (const ifaces of Object.values(nets)) {
+    for (const n of ifaces) {
+      if (n && n.family === 'IPv4' && !n.internal) {
+        if (!fallback) fallback = n.address;
+        if (n.address.startsWith(preferPrefix)) return n.address;
+      }
+    }
+  }
+  return fallback || 'localhost';
+}
+
+// ✅ Google Sheets routes (ensure any wildcards inside use "/*" or "(.*)" for Express 5)
+app.use('/', googleSheetsRoutes);
 
 // ✅ LDAP Login route
 app.post('/login', (req, res) => {
@@ -22,10 +41,10 @@ app.post('/login', (req, res) => {
   }
 
   const client = ldap.createClient({
-    url: 'ldap://10.27.16.5' // ✅ Confirmed IP of SWDADC
+    url: 'ldap://10.27.16.5' // SWDADC
   });
 
-const userPrincipalName = username.includes("@") ? username : `${username}@swd.bh`;
+  const userPrincipalName = username.includes("@") ? username : `${username}@swd.bh`;
 
   client.bind(userPrincipalName, password, (err) => {
     if (err) {
@@ -77,7 +96,7 @@ const userPrincipalName = username.includes("@") ? username : `${username}@swd.b
   });
 });
 
-// ✅ Internal Email via SMTP Relay (now supports custom sender)
+// ✅ Internal Email via SMTP Relay (supports custom sender)
 app.post('/send-email', async (req, res) => {
   const { to, subject, message, fromEmail } = req.body;
 
@@ -87,7 +106,7 @@ app.post('/send-email', async (req, res) => {
 
   try {
     const transporter = nodemailer.createTransport({
-      host: "10.27.16.4", // ✅ Internal SMTP
+      host: "10.27.16.4", // Internal SMTP
       port: 25,
       secure: false,
       tls: {
@@ -96,7 +115,7 @@ app.post('/send-email', async (req, res) => {
     });
 
     const mailOptions = {
-      from: fromEmail || `"Meeting Booking" <booking@swd.bh>`, // ✅ dynamic sender
+      from: fromEmail || `"Meeting Booking" <booking@swd.bh>`,
       to,
       subject,
       text: message,
@@ -105,26 +124,24 @@ app.post('/send-email', async (req, res) => {
     await transporter.sendMail(mailOptions);
     console.log(`✅ Email sent from ${mailOptions.from} to ${to}`);
     res.status(200).json({ success: true });
-
   } catch (error) {
     console.error("❌ Email send error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// ✅ Serve React build in production
+// ✅ Serve React build in production (Express 5-compatible catch-all)
 if (process.env.NODE_ENV === "production") {
   const clientBuildPath = path.join(__dirname, "../meeting-book-client/build");
   app.use(express.static(clientBuildPath));
 
-app.get("/*", (req, res) => {
+  app.get("/*", (req, res) => {
     res.sendFile(path.join(clientBuildPath, "index.html"));
   });
 }
 
-// ✅ Start server
+// ✅ Start server (bind all interfaces) with auto-detected IP in log
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  const host = getLocalIPv4('10.');
+  console.log(`Server running at http://${host}:${PORT}`);
 });
-
-
