@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const googleSheetsRoutes = require('./googleSheets');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const ldap = require('ldapjs');
@@ -29,8 +28,6 @@ function getLocalIPv4(preferPrefix = '10.') {
   return fallback || 'localhost';
 }
 
-// ✅ Google Sheets routes (ensure any wildcards inside use "/*" or "(.*)" for Express 5)
-app.use('/', googleSheetsRoutes);
 
 // ✅ LDAP Login route
 app.post('/login', (req, res) => {
@@ -134,7 +131,6 @@ app.post('/send-email', async (req, res) => {
 if (process.env.NODE_ENV === "production") {
   const clientBuildPath = path.join(__dirname, "../meeting-book-client/build");
   app.use(express.static(clientBuildPath));
-
   app.get("/*", (req, res) => {
     res.sendFile(path.join(clientBuildPath, "index.html"));
   });
