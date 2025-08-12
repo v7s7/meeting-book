@@ -21,8 +21,8 @@ import { sendEmail } from "./utils/email";
 import './App.css';
 
 const ADMIN_NOTIFICATION_CONFIG = [
-  { email: "a.alkubaesy@swd.bh", floors: [7, 10] },
-  // { email: "m.adil@swd.bh", floors: [7, 10] },
+{ email: "a.khaled@swd.bh", floors: [7,10] },
+     { email: "a.qambar@swd.bh", floors: [7, 10] },
 ];
 
 // ✅ Same-origin by default (works on new server without hardcoding)

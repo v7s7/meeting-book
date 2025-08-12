@@ -17,23 +17,42 @@ export default function LoginModal({ open, onClose, loginForm, setLoginForm, onL
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <h3>Login</h3>
 
-        <input
-          ref={usernameRef}
-          placeholder="Username (e.g. user or user@swd.bh)"
-          value={loginForm.username}
-          onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={loginForm.password}
-          onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-        />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onLogin();
+          }}
+        >
+          <input
+            ref={usernameRef}
+            placeholder="Username (e.g. user or user@swd.bh)"
+            value={loginForm.username}
+            onChange={(e) =>
+              setLoginForm((prev) => ({ ...prev, username: e.target.value }))
+            }
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={loginForm.password}
+            onChange={(e) =>
+              setLoginForm((prev) => ({ ...prev, password: e.target.value }))
+            }
+          />
 
-        <div className="modal-actions">
-          <button className="login-btn" onClick={onLogin}>Login</button>
-          <button className="cancel-btn" onClick={onClose}>Cancel</button>
-        </div>
+          <div className="modal-actions">
+            <button className="login-btn" type="submit">
+              Login
+            </button>
+            <button
+              className="cancel-btn"
+              type="button"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
