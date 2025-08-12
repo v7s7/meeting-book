@@ -2,14 +2,25 @@ import React, { useState } from 'react';
 import './BookingForm.css';
 
 function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
-  const [room, setRoom] = useState('Room 1');
+  const [room, setRoom] = useState('Room1');  // ✅ use resource ID (no space)
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [duration, setDuration] = useState(30);
 
+  const DURATIONS = [30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 270, 300];
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!date || !time) return;
+
+    // Enforce start time: 08:00 ≤ start < 17:00
+    const [hh, mm] = time.split(':');
+    const hour = Number(hh);
+    const minute = Number(mm || 0);
+    if (Number.isNaN(hour) || hour < 8 || hour >= 18) {
+      alert("Start time must be between 08:00 and 17:00 (5 PM).");
+      return;
+    }
 
     const start = new Date(`${date}T${time}`);
     if (start < new Date()) {
@@ -22,7 +33,7 @@ function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
     onSubmit({
       start: start.toISOString(),
       end: end.toISOString(),
-      resourceId: room
+      resourceId: room,   // ✅ matches CalendarView resource IDs
     });
 
     onClose();
@@ -49,6 +60,8 @@ function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
+            min="08:00"
+            max="17:00"
             required
           />
 
@@ -56,22 +69,26 @@ function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
           <select value={room} onChange={(e) => setRoom(e.target.value)}>
             {selectedFloor === 10 ? (
               <>
-                <option value="Room 1">Room 1</option>
-                <option value="Room 2">Room 2</option>
-                <option value="Room 3">Room 3</option>
+                <option value="Room1">Room 1 ( Big Room )</option>
+                <option value="Room2">Room 2 ( Mid Room )</option>
+                <option value="Room3">Room 3 ( Small Room NO TV )</option>
               </>
             ) : (
               <>
-                <option value="Room 1">Room 1</option>
-                <option value="Room 2">Room 2</option>
+                <option value="Room1">Meeting Room</option>
+                <option value="Room2">Training Room</option>
               </>
             )}
           </select>
 
-          <label>Duration (minutes):</label>
+          <label>Duration:</label>
           <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-            {[30, 60, 90, 120].map(min => (
-              <option key={min} value={min}>{min} minutes</option>
+            {DURATIONS.map((min) => (
+              <option key={min} value={min}>
+                {min % 60 === 0
+                  ? `${min / 60} hour${min > 60 ? 's' : ''}`
+                  : `${Math.floor(min / 60)}h ${min % 60}m`}
+              </option>
             ))}
           </select>
 

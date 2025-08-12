@@ -6,7 +6,9 @@ function BookingForm({ slot, events, onClose, onSubmit, loggedInUser }) {
     name: '',
     email: '',
     department: '',
-    customDepartment: ''
+    customDepartment: '',
+    purpose: '',       // NEW
+    attendees: ''      // NEW
   });
 
   const [duration, setDuration] = useState(60);
@@ -15,19 +17,20 @@ function BookingForm({ slot, events, onClose, onSubmit, loggedInUser }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOtherSelected, setIsOtherSelected] = useState(false);
 
- useEffect(() => {
-  if (loggedInUser) {
-    setFormData({
-      name: loggedInUser.name || '',
-      email: loggedInUser.email || loggedInUser.username || '',
-      department: loggedInUser.department || '',
-      customDepartment: loggedInUser.customDepartment || ''
-    });
-  }
-  // only run once on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
+  useEffect(() => {
+    if (loggedInUser) {
+      setFormData({
+        name: loggedInUser.name || '',
+        email: loggedInUser.email || loggedInUser.username || '',
+        department: loggedInUser.department || '',
+        customDepartment: loggedInUser.customDepartment || '',
+        purpose: '',
+        attendees: ''
+      });
+    }
+    // only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync isOtherSelected based on loaded department
   useEffect(() => {
@@ -95,26 +98,33 @@ function BookingForm({ slot, events, onClose, onSubmit, loggedInUser }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (hasConflict || isSubmitting) return;
+
+    // Basic validation for new fields
+    if (!formData.purpose || formData.purpose.trim().length < 3) {
+      alert("Please enter a short purpose for the meeting (min 3 characters).");
+      return;
+    }
+    const n = Number(formData.attendees);
+    if (!Number.isInteger(n) || n <= 0) {
+      alert("Please enter the expected number of people (a positive integer).");
+      return;
+    }
+
     setIsSubmitting(true);
     onClose();
 
-    const finalDepartment =
-      formData.department === "Other"
-        ? formData.customDepartment
-        : formData.department;
-
     const isCustom = formData.department === "Other";
 
-onSubmit(
-  {
-    ...formData,
-    department: isCustom ? "Other" : formData.department,
-    customDepartment: isCustom ? formData.customDepartment : "",
-    room: slot.resourceId
-  },
-  calculatedEnd
-)
-
+    onSubmit(
+      {
+        ...formData,
+        department: isCustom ? "Other" : formData.department,
+        customDepartment: isCustom ? formData.customDepartment : "",
+        attendees: Number(formData.attendees), // ensure numeric
+        room: slot.resourceId
+      },
+      calculatedEnd
+    )
       .catch(err => console.error("Booking failed:", err))
       .finally(() => setIsSubmitting(false));
   };
@@ -175,11 +185,11 @@ onSubmit(
             onChange={handleChange}
             required
           >
-<option value="" disabled hidden>
-  {formData.department === "Other" && formData.customDepartment
-    ? "Other"
-    : "Select Department"}
-</option>
+            <option value="" disabled hidden>
+              {formData.department === "Other" && formData.customDepartment
+                ? "Other"
+                : "Select Department"}
+            </option>
             {departmentOptions.map(dept => (
               <option key={dept} value={dept}>{dept}</option>
             ))}
@@ -197,6 +207,26 @@ onSubmit(
               />
             </>
           )}
+
+          {/* NEW FIELDS */}
+          <label>Purpose of Meeting:</label>
+          <textarea
+            name="purpose"
+            value={formData.purpose}
+            onChange={handleChange}
+            required
+          />
+
+          <label>Expected Number of People:</label>
+          <input
+            type="number"
+            name="attendees"
+            min="1"
+            step="1"
+            value={formData.attendees}
+            onChange={handleChange}
+            required
+          />
 
           {hasConflict && <p className="conflict">This slot is already booked in this room.</p>}
 

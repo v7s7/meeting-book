@@ -73,7 +73,8 @@
 
 /* Form Inputs */
 input,
-select {
+select,
+textarea  {
   width: 100%;
   padding: 12px;
   margin: 12px 0;
@@ -167,3 +168,4 @@ select {
   font-size: 16px;
   box-sizing: border-box;
 }
+/* Match textarea style to inputs/selects */

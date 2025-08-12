@@ -1,0 +1,4 @@
+﻿.env
+meeting-book-client/.env
+meeting-book-server/.env
+meeting-book-server/config/service-account.json

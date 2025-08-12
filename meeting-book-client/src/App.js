@@ -21,8 +21,9 @@ import { sendEmail } from "./utils/email";
 import './App.css';
 
 const ADMIN_NOTIFICATION_CONFIG = [
-{ email: "a.khaled@swd.bh", floors: [7,10] },
-     { email: "a.qambar@swd.bh", floors: [7, 10] },
+  // { email: "a.alkubaesy@swd.bh", floors: [7,10] },
+  { email: "a.khaled@swd.bh", floors: [7,10] },
+  { email: "a.qambar@swd.bh", floors: [7, 10] },
 ];
 
 // ✅ Same-origin by default (works on new server without hardcoding)
@@ -191,6 +192,8 @@ Room: ${slot.resourceId}
 Start: ${new Date(slot.start).toLocaleString()}
 End: ${new Date(calculatedEnd).toLocaleString()}
 Floor: ${floorName}
+Purpose: ${formData.purpose || "-"}
+Attendees: ${formData.attendees ?? "-"}
 
 Review & manage bookings:
 ${APP_URL}
@@ -235,7 +238,9 @@ ${APP_URL}
       userEmail: currentUser.username,
       bookedBy: userName,
       floor: selectedFloor,
-      status: "pending"
+      status: "pending",
+      purpose: formData.purpose || "",
+      attendees: Number(formData.attendees) || 0
     });
 
     await setDoc(doc(db, 'users', userId), {
