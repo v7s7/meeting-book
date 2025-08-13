@@ -75,7 +75,7 @@ function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
               </>
             ) : (
               <>
-                <option value="Room1">Meeting Room</option>
+                <option value="Room1">Meeting Room (Masaajid)</option>
                 <option value="Room2">Training Room</option>
               </>
             )}
