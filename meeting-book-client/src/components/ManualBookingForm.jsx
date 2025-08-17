@@ -61,7 +61,7 @@ function ManualBookingForm({ onClose, onSubmit, selectedFloor }) {
             value={time}
             onChange={(e) => setTime(e.target.value)}
             min="08:00"
-            max="17:00"
+            max="18:00"
             required
           />
 
